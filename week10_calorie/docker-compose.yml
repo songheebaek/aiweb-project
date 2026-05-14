@@ -1,0 +1,43 @@
+# 6주차 칼로리카운터 → Oracle E2.1.Micro 운영용 compose
+# 9주차 수업 자산. SSH로 Oracle 인스턴스 들어간 후 이 파일 한 장으로 운영.
+#
+# 운영 명령:
+#   docker compose up -d --build      # 첫 빌드 + 백그라운드 기동
+#   docker compose logs -f            # 실시간 로그
+#   docker compose ps                 # 상태 확인
+#   docker compose down               # 정지·제거
+#   git pull && docker compose up -d --build   # 코드 갱신 후 재배포
+
+services:
+  calorie:
+    build: .
+    image: calorie-counter:latest
+    container_name: calorie-counter
+    restart: unless-stopped         # 서버 재부팅 시 자동 기동, 수동 중지는 존중
+
+    ports:
+      - "7860:7860"                 # 호스트:컨테이너 (nginx가 80/443에서 → 7860으로 프록시)
+
+    env_file:
+      - .env                        # HF_TOKEN 등 비밀값 (이 파일은 git 제외 / chmod 600)
+
+    environment:
+      # Dockerfile에서 이미 설정했지만 compose에서도 명시 → 운영자에게 가시화
+      - GRADIO_SERVER_NAME=0.0.0.0
+      - GRADIO_SERVER_PORT=7860
+
+    # E2.1.Micro 1GB RAM 보호: 컨테이너에 500MB 한도, swap 1GB까지 허용
+    mem_limit: 500m
+    memswap_limit: 1500m
+    deploy:
+      resources:
+        limits:
+          memory: 500M
+
+    # OOM 발생 시 docker가 재기동 (Dockerfile HEALTHCHECK와 함께 동작)
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:7860/').read()"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3

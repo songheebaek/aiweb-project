@@ -1,0 +1,92 @@
+# 9주차 CI/CD 템플릿: GitHub push → Oracle E2.1.Micro 자동 배포
+# 학생 본인 리포에 그대로 복사. Secrets 4개(SSH_HOST, SSH_USER, SSH_KEY, HF_TOKEN) 등록 후 작동.
+#
+# 작동 흐름:
+#   학생이 main 브랜치에 push
+#   → ubuntu-latest 러너 부팅
+#   → SSH로 Oracle 서버 접속
+#   → /home/ubuntu/calorie 에서 git pull
+#   → docker compose 새 이미지 빌드·재기동
+#   → <id>-demo.aiweb2026.site 즉시 반영
+#
+# 사전 1회 서버 설정 (수업 중 강사 시연):
+#   ssh ubuntu@<서버IP>
+#   mkdir -p /home/ubuntu/calorie && cd /home/ubuntu/calorie
+#   git clone https://github.com/<학생>/calorie-counter.git .
+#   echo "HF_TOKEN=hf_xxx" > .env && chmod 600 .env
+#   docker compose up -d --build
+
+name: Deploy to Oracle E2.1.Micro
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:                # 수동 트리거 옵션 (Actions 탭에서 "Run workflow" 버튼)
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 1. 리포 체크아웃 (로그·diff 가시화용)
+        uses: actions/checkout@v4
+
+      - name: 2. 커밋 정보 표시
+        run: |
+          echo "🚀 배포 커밋: ${{ github.sha }}"
+          echo "👤 트리거 사용자: ${{ github.actor }}"
+          echo "📝 메시지: ${{ github.event.head_commit.message }}"
+
+      - name: 3. Oracle 서버에 SSH 접속하여 배포
+        uses: appleboy/ssh-action@v1
+        env:
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}.git
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: 22
+          timeout: 60s
+          command_timeout: 10m
+          envs: REPO_URL
+          script: |
+            set -e
+            echo "▶ 배포 시작: $(date)"
+            cd /home/ubuntu/calorie
+
+            # 첫 배포라 .git이 없으면 자동 초기화
+            if [ ! -d .git ]; then
+              echo "▶ .git 없음 — 첫 배포로 판단하여 git init + remote 등록"
+              git init
+              git remote add origin "$REPO_URL"
+            fi
+
+            echo "▶ 최신 코드 pull"
+            git fetch origin main
+            git reset --hard origin/main
+
+            echo "▶ 새 이미지 빌드 + 컨테이너 재기동"
+            docker compose up -d --build
+
+            echo "▶ 헬스체크 대기 (최대 60초)"
+            for i in {1..12}; do
+              if curl -fsS -o /dev/null http://127.0.0.1:7860/; then
+                echo "✅ 컨테이너 응답 확인"
+                break
+              fi
+              echo "  ... 대기 중 ($i/12)"
+              sleep 5
+            done
+
+            echo "▶ 최종 상태"
+            docker ps --filter "name=calorie-counter" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+            echo "✅ 배포 완료: $(date)"
+
+      - name: 4. 배포 실패 시 로그 알림 (선택)
+        if: failure()
+        run: |
+          echo "❌ 배포 실패. Oracle 서버에 SSH 접속해서 로그 확인:"
+          echo "  ssh ubuntu@${{ secrets.SSH_HOST }}"
+          echo "  docker compose logs --tail=100 calorie"
