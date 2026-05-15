@@ -1,4 +1,19 @@
+# 절대 GitHub에 push 하면 안 되는 파일 (HF_TOKEN 노출)
 .env
-.env.*
+*.env
+
+# Python
 __pycache__/
-node_modules/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
