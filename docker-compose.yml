@@ -1,43 +1,34 @@
-# 11주차 스트레스 몬스터 → Oracle E2.1.Micro 운영용 compose
-# 10주차 칼로리카운터 compose를 그대로 재활용. 서비스/컨테이너 이름만 변경.
+# YouTube 영상 요약기 → Oracle E2.1.Micro 운영용 compose
+# 스트레스 몬스터 compose 패턴 재활용. 포트 7860→8501, 헬스체크 엔드포인트 교체.
 #
-# 운영 명령:
-#   docker compose up -d --build      # 첫 빌드 + 백그라운드 기동
-#   docker compose logs -f            # 실시간 로그
-#   docker compose ps                 # 상태 확인
-#   docker compose down               # 정지·제거
-#   git pull && docker compose up -d --build   # 코드 갱신 후 재배포
+#   docker compose up -d --build              # 첫 빌드 + 백그라운드 기동
+#   docker compose logs -f                    # 실시간 로그
+#   git pull && docker compose up -d --build  # 코드 갱신 후 재배포
 
 services:
-  stress-monster:
+  youtube-summarizer:
     build: .
-    image: stress-monster:latest
-    container_name: stress-monster
-    restart: unless-stopped         # 서버 재부팅 시 자동 기동, 수동 중지는 존중
+    image: youtube-summarizer:latest
+    container_name: youtube-summarizer
+    restart: unless-stopped
 
     ports:
-      - "7860:7860"                 # 호스트:컨테이너 (nginx가 80/443에서 → 7860으로 프록시)
+      - "8501:8501"               # 호스트:컨테이너 (nginx가 80에서 → 8501로 프록시)
 
     env_file:
-      - .env                        # HF_TOKEN 등 비밀값 (이 파일은 git 제외 / chmod 600)
+      - .env                      # GOOGLE_API_KEY 등 (git 제외 / chmod 600)
 
-    environment:
-      # Dockerfile에서 이미 설정했지만 compose에서도 명시 → 운영자에게 가시화
-      - GRADIO_SERVER_NAME=0.0.0.0
-      - GRADIO_SERVER_PORT=7860
-
-    # E2.1.Micro 1GB RAM 보호: 컨테이너에 500MB 한도, swap 1GB까지 허용
-    mem_limit: 500m
-    memswap_limit: 1500m
+    # E2.1.Micro 1GB RAM 보호
+    mem_limit: 400m
+    memswap_limit: 1200m
     deploy:
       resources:
         limits:
-          memory: 500M
+          memory: 400M
 
-    # OOM 발생 시 docker가 재기동 (Dockerfile HEALTHCHECK와 함께 동작)
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:7860/').read()"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health').read()"]
       interval: 30s
       timeout: 5s
-      start_period: 60s
+      start_period: 30s
       retries: 3

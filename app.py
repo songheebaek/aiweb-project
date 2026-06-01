@@ -1,348 +1,343 @@
-"""
-11주차 실습: 나의 스트레스 몬스터 (LangChain LCEL + OpenAI)
-==========================================================
-사용자가 오늘의 스트레스를 한 문장 이상 입력하면
-  1) ChatOpenAI(gpt-4o-mini) LCEL 체인이 JSON 모드로 스트레스 유형/몬스터 이름/특징/이미지 프롬프트 생성
-  2) OpenAI Images API(DALL·E 3)가 몬스터 캐릭터 이미지를 생성
-  3) Gradio UI로 "오늘의 스트레스 몬스터 카드"를 보여준다.
+"""YouTube 영상 요약기 — Streamlit 프론트엔드.
 
-10주차 칼로리카운터의 LCEL 패턴(prompt | llm | parser)을 그대로 재활용한다.
+URL 입력 → 자막 추출(youtube-transcript-api) → Gemini로 요약 / 타임스탬프 핵심 / Q&A.
+UI는 프로젝트 썸네일 목업 디자인을 따름 (헤더 → URL바 → 요약|영상 → 타임스탬프|Q&A → 기능 칩).
+
+로컬 실행:  streamlit run app.py
+배포:       Dockerfile/docker-compose 참조 (포트 8501)
 """
 
-from __future__ import annotations
-
-import base64
 import os
 import re
-from datetime import datetime, timedelta
-from io import BytesIO
-from typing import Any
 
-import gradio as gr
-import openai
-from gradio_client import utils as _gc_utils  # noqa: E402
-
-# --- workaround: gradio_client의 JSON Schema walker가 bool 스키마를 만나면
-# 터지는 버그(#10178) 우회.
-_orig_get_type = _gc_utils.get_type
-def _safe_get_type(schema):
-    if isinstance(schema, bool):
-        return "Any"
-    return _orig_get_type(schema)
-_gc_utils.get_type = _safe_get_type
-
-_orig_j2p = _gc_utils._json_schema_to_python_type
-def _safe_j2p(schema, defs=None):
-    if isinstance(schema, bool):
-        return "Any"
-    return _orig_j2p(schema, defs)
-_gc_utils._json_schema_to_python_type = _safe_j2p
-
+import streamlit as st
 from dotenv import load_dotenv
-from langchain_core.output_parsers import JsonOutputParser
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
-from openai import OpenAI
-from PIL import Image
+from youtube_transcript_api import (
+    YouTubeTranscriptApi,
+    TranscriptsDisabled,
+    NoTranscriptFound,
+    VideoUnavailable,
+    IpBlocked,
+    RequestBlocked,
+    CouldNotRetrieveTranscript,
+)
+from youtube_transcript_api.proxies import GenericProxyConfig
 
-from model_config import IMAGE_MODEL, LLM_MODEL, get_token
+import model_config
 
 load_dotenv()
 
-SYSTEM_PROMPT = (
-    "너는 사용자의 오늘 스트레스 문장을 읽고 귀엽고 웃긴 '스트레스 몬스터' 카드를 만드는 분석가다.\n"
-    "사용자를 비판하지 말고, 스트레스를 외재화해서 친근한 캐릭터로 만들어라.\n"
-    "위트있고 따뜻한 톤. 너무 진지하거나 의학적이지 않게.\n"
-    "반드시 아래 JSON 스키마만 출력하고 다른 텍스트/마크다운/코드블록은 절대 금지.\n"
-    '{{"stress_type": str (예: 업무/인간관계/학업/건강/재정/미래 불안 등), '
-    '"stress_index": int (1~10), '
-    '"monster_name": str (한국어, 귀엽고 웃긴 이름. 예: 마감지옥 슬라임, 눈치왕 두꺼비), '
-    '"monster_species": str (예: 슬라임, 도깨비, 거미, 곰팡이), '
-    '"traits": [str, str, str], '
-    '"weakness": str (몬스터를 약화시키는 방법 = 사용자에게 도움 되는 짧은 조언), '
-    '"description": str (이 몬스터에 대한 2~3문장 위트있는 설명), '
-    '"image_prompt": str (반드시 영어, SFW. 몬스터 외형/색감/표정을 묘사. '
-    '"chibi style, pastel colors, white background, full body, kawaii, cute cartoon monster" 키워드 포함)'
-    "}}"
+# 자막 언어 우선순위 (한국어 → 영어 순으로 시도)
+TRANSCRIPT_LANGS = ["ko", "en"]
+
+
+# ----------------------------- 유틸 -----------------------------
+def extract_video_id(url: str) -> str | None:
+    """다양한 유튜브 URL 형식에서 11자리 video id 추출."""
+    url = url.strip()
+    patterns = [
+        r"(?:v=|/watch\?.*v=)([0-9A-Za-z_-]{11})",
+        r"youtu\.be/([0-9A-Za-z_-]{11})",
+        r"/embed/([0-9A-Za-z_-]{11})",
+        r"/shorts/([0-9A-Za-z_-]{11})",
+    ]
+    for p in patterns:
+        m = re.search(p, url)
+        if m:
+            return m.group(1)
+    if re.fullmatch(r"[0-9A-Za-z_-]{11}", url):
+        return url
+    return None
+
+
+def fmt_time(seconds: float) -> str:
+    """초 → m:ss 또는 h:mm:ss."""
+    s = int(seconds)
+    h, m, s = s // 3600, (s % 3600) // 60, s % 60
+    return f"{h}:{m:02d}:{s:02d}" if h else f"{m:02d}:{s:02d}"
+
+
+def fetch_transcript(video_id: str) -> list:
+    """자막 세그먼트 [{text, start, duration}] 리스트 반환.
+
+    youtube-transcript-api 1.x 인스턴스 API 사용. 클라우드 IP 차단 대비 PROXY_URL 지원.
+    """
+    proxy_url = os.getenv("PROXY_URL")
+    proxy_config = (
+        GenericProxyConfig(http_url=proxy_url, https_url=proxy_url) if proxy_url else None
+    )
+    api = YouTubeTranscriptApi(proxy_config=proxy_config)
+    return api.fetch(video_id, languages=TRANSCRIPT_LANGS).to_raw_data()
+
+
+def build_timestamped_text(segments: list) -> str:
+    """[분:초] 텍스트 형태로 합쳐 AI에 넘길 문자열 생성."""
+    return "\n".join(f"[{fmt_time(seg['start'])}] {seg['text']}" for seg in segments)
+
+
+def esc(text: str) -> str:
+    """HTML 삽입 시 최소 이스케이프."""
+    return (
+        text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    )
+
+
+# ----------------------------- 페이지 설정 + 스타일 -----------------------------
+st.set_page_config(
+    page_title="YouTube Summarizer",
+    page_icon="🎬",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
+
+st.markdown(
+    """
+    <style>
+    /* ----- 전체 배경 / 여백 ----- */
+    .stApp { background: linear-gradient(180deg, #f7f8fc 0%, #eef0f8 100%); }
+    .block-container { padding-top: 2.2rem; padding-bottom: 1rem; max-width: 1180px; }
+
+    /* ----- 헤더 ----- */
+    .hero { display: flex; align-items: center; gap: 18px; margin-bottom: 4px; }
+    .yt-logo {
+        width: 64px; height: 46px; background: #ff0000; border-radius: 14px;
+        display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+        box-shadow: 0 6px 16px rgba(255,0,0,.25);
+    }
+    .yt-logo:after {
+        content: ""; border-style: solid; border-width: 10px 0 10px 17px;
+        border-color: transparent transparent transparent #fff; margin-left: 4px;
+    }
+    .hero-title { font-size: 2.6rem; font-weight: 800; line-height: 1.05; color: #15182b; letter-spacing: -1px; }
+    .hero-sub { font-size: 1.05rem; color: #6b7392; margin: 8px 0 22px 2px; font-weight: 500; }
+
+    /* ----- 카드 (st.container border 보강) ----- */
+    div[data-testid="stVerticalBlockBorderWrapper"] {
+        background: #ffffff; border: 1px solid #eceef5 !important;
+        border-radius: 18px; box-shadow: 0 8px 30px rgba(40,50,90,.06);
+        padding: 6px 10px;
+    }
+    .card-head { font-size: 1.12rem; font-weight: 700; color: #1f2438; margin: 4px 2px 12px; }
+
+    /* ----- 기능 카드 (빈 화면) ----- */
+    .feat { text-align: left; }
+    .feat-ico { font-size: 1.6rem; }
+    .feat-title { font-size: 1.08rem; font-weight: 700; color: #1f2438; margin-top: 6px; }
+    .feat-desc { font-size: .92rem; color: #6b7392; margin-top: 4px; line-height: 1.45; }
+
+    /* ----- 타임스탬프 행 ----- */
+    .ts-row { display: flex; gap: 14px; padding: 9px 4px; border-bottom: 1px solid #f1f2f8; }
+    .ts-row:last-child { border-bottom: none; }
+    .ts-time { color: #16a34a; font-weight: 700; font-variant-numeric: tabular-nums;
+               text-decoration: none; flex-shrink: 0; min-width: 52px; }
+    .ts-time:hover { text-decoration: underline; }
+    .ts-text { color: #2b3047; font-size: .96rem; line-height: 1.4; }
+
+    /* ----- Q&A 말풍선 ----- */
+    .bubbles { min-height: 60px; }
+    .bubble-row { display: flex; margin: 8px 0; }
+    .bubble-row.user { justify-content: flex-end; }
+    .bubble { padding: 10px 14px; border-radius: 16px; max-width: 85%; font-size: .95rem; line-height: 1.45; }
+    .bubble.user { background: #eef0fb; color: #2b3047; border-bottom-right-radius: 5px; }
+    .bubble.bot { background: #f4f5f9; color: #2b3047; border-bottom-left-radius: 5px; }
+
+    /* ----- 버튼: 보라색 ----- */
+    .stButton > button, .stFormSubmitButton > button {
+        background: #6c5ce7; color: #fff; border: none; border-radius: 12px;
+        font-weight: 700; padding: .55rem 1.1rem;
+    }
+    .stButton > button:hover, .stFormSubmitButton > button:hover { background: #5a4bd4; color: #fff; }
+
+    /* ----- 입력창 ----- */
+    .stTextInput input { border-radius: 12px; }
+
+    /* ----- 하단 기능 칩 ----- */
+    .chips { display: flex; justify-content: center; gap: 38px; flex-wrap: wrap;
+             margin: 26px 0 6px; color: #5b627e; font-weight: 600; font-size: .95rem; }
+    .chips span { display: inline-flex; align-items: center; gap: 8px; }
+
+    [data-testid="stMetricValue"] { font-size: 1.3rem; }
+    </style>
+    """,
+    unsafe_allow_html=True,
 )
 
 
-# -----------------------------------------------------------------------------
-# 클라이언트 / 체인 lazy init
-# -----------------------------------------------------------------------------
-_image_client: OpenAI | None = None
-_chain = None
+# ----------------------------- 세션 상태 -----------------------------
+for key, default in [
+    ("segments", None),
+    ("transcript_text", None),
+    ("summary", None),
+    ("highlights", None),
+    ("chat", []),
+    ("video_id", None),
+]:
+    st.session_state.setdefault(key, default)
 
 
-def _image_lazy() -> OpenAI:
-    global _image_client
-    if _image_client is None:
-        _image_client = OpenAI(api_key=get_token())
-    return _image_client
+# ----------------------------- 헤더 -----------------------------
+st.markdown(
+    """
+    <div class="hero">
+        <div class="yt-logo"></div>
+        <div>
+            <div class="hero-title">YouTube Summarizer</div>
+        </div>
+    </div>
+    <div class="hero-sub">긴 영상을 빠르게 이해하는 가장 스마트한 방법</div>
+    """,
+    unsafe_allow_html=True,
+)
 
 
-def _chain_lazy():
-    """LCEL 체인: prompt | ChatOpenAI(JSON mode) | JsonOutputParser"""
-    global _chain
-    if _chain is None:
-        llm = ChatOpenAI(
-            model=LLM_MODEL,
-            temperature=0.8,
-            api_key=get_token(),
-            model_kwargs={"response_format": {"type": "json_object"}},
-        )
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                ("system", SYSTEM_PROMPT),
-                ("human", "오늘의 스트레스:\n{stress_text}"),
-            ]
-        )
-        _chain = prompt | llm | JsonOutputParser()
-    return _chain
-
-
-# -----------------------------------------------------------------------------
-# Quota / Rate-limit 메시지 포맷터
-# -----------------------------------------------------------------------------
-_DURATION_RE = re.compile(r"(\d+(?:\.\d+)?)(ms|s|m|h)")
-
-
-def _parse_openai_duration(s: str | None) -> float | None:
-    """OpenAI 헤더의 '6m0s', '20ms' 같은 duration 문자열 → 초."""
-    if not s:
-        return None
-    total = 0.0
-    for value, unit in _DURATION_RE.findall(s):
-        v = float(value)
-        total += {"ms": v / 1000, "s": v, "m": v * 60, "h": v * 3600}[unit]
-    return total or None
-
-
-def _next_month_first_local() -> datetime:
-    now = datetime.now().astimezone()
-    if now.month == 12:
-        return now.replace(year=now.year + 1, month=1, day=1,
-                           hour=0, minute=0, second=0, microsecond=0)
-    return now.replace(month=now.month + 1, day=1,
-                       hour=0, minute=0, second=0, microsecond=0)
-
-
-def format_quota_message(exc: openai.RateLimitError) -> tuple[str, str]:
-    """RateLimitError → (토스트 한 줄, 마크다운 본문). 한국어."""
-    # 에러 코드 추출
-    code = ""
-    try:
-        body = getattr(exc, "body", None)
-        if isinstance(body, dict):
-            code = (body.get("error") or {}).get("code") or ""
-    except Exception:
-        pass
-
-    # 1) 결제 한도 소진 — 자동 reset 없음, 다음 결제 주기 추정
-    if code == "insufficient_quota":
-        nxt = _next_month_first_local()
-        eta = nxt.strftime("%Y년 %-m월 %-d일 %H:%M") if os.name != "nt" \
-            else nxt.strftime("%Y년 %#m월 %#d일 %H:%M")
-        toast = f"🪙 OpenAI API 한도 소진 — {eta}쯤 다시 만나요!"
-        md = (
-            "## 🪙 OpenAI API 한도가 소진됐어\n\n"
-            f"이번 결제 주기의 API 한도가 끝났어. (`insufficient_quota`)\n\n"
-            f"**다음 reset 예상**: `{eta}` (월 결제 주기 기준)\n\n"
-            "👉 그 때 다시 만나자! 🌙\n\n"
-            "결제/사용량 확인: https://platform.openai.com/account/billing/overview"
-        )
-        return toast, md
-
-    # 2) RPM/TPM rate limit — retry-after 헤더 파싱
-    retry_after_s: float | None = None
-    headers = getattr(getattr(exc, "response", None), "headers", None)
-    if headers is not None:
-        for h in ("retry-after", "x-ratelimit-reset-requests",
-                  "x-ratelimit-reset-tokens"):
-            raw = headers.get(h)
-            if not raw:
-                continue
-            try:
-                retry_after_s = float(raw)
-            except (TypeError, ValueError):
-                retry_after_s = _parse_openai_duration(raw)
-            if retry_after_s:
-                break
-
-    if retry_after_s and retry_after_s > 0:
-        eta_dt = datetime.now().astimezone() + timedelta(seconds=retry_after_s)
-        secs = int(retry_after_s)
-        eta_str = eta_dt.strftime("%H:%M:%S")
-        toast = f"⏳ 잠깐 쉬는 중 — {secs}초 뒤({eta_str})에 다시 만나요!"
-        md = (
-            "## ⏳ 잠깐 쉬어가는 중\n\n"
-            "호출이 너무 빨라서 OpenAI가 잠시 쉬라고 하네.\n\n"
-            f"**{secs}초 뒤** (`{eta_str}`)에 다시 시도해줘! 🌙"
-        )
-        return toast, md
-
-    # 3) 기타 (헤더 못 읽었을 때 fallback)
-    toast = "⏳ Rate limit — 1분쯤 뒤에 다시 만나요!"
-    md = (
-        "## ⏳ 잠깐 쉬어가는 중\n\n"
-        "OpenAI가 잠시 숨고르는 중이야. **1분 후** 다시 시도해줘!"
+# ----------------------------- URL 입력 바 -----------------------------
+col_url, col_btn = st.columns([6, 1], vertical_alignment="bottom")
+with col_url:
+    url = st.text_input(
+        "URL",
+        placeholder="요약하고 싶은 영상 url을 입력해주세요. (https://www.youtube.com/watch?v=xxxxxxxxx)",
+        label_visibility="collapsed",
     )
-    return toast, md
+with col_btn:
+    analyze = st.button("요약하기", type="primary", use_container_width=True)
 
 
-# -----------------------------------------------------------------------------
-# Step 1: 스트레스 분석 (LCEL 체인)
-# -----------------------------------------------------------------------------
-def analyze_stress(stress_text: str) -> dict[str, Any]:
-    return _chain_lazy().invoke({"stress_text": stress_text})
+# ----------------------------- 분석 실행 -----------------------------
+if analyze:
+    video_id = extract_video_id(url)
+    if not video_id:
+        st.error("유효한 유튜브 URL이 아닙니다. 주소를 다시 확인해주세요.")
+        st.stop()
+
+    if video_id != st.session_state.video_id:
+        st.session_state.update(video_id=video_id, summary=None, highlights=None, chat=[])
+
+    with st.spinner("자막을 추출하는 중..."):
+        try:
+            segments = fetch_transcript(video_id)
+        except TranscriptsDisabled:
+            st.error("이 영상은 자막이 비활성화되어 있어 요약할 수 없습니다."); st.stop()
+        except NoTranscriptFound:
+            st.error(f"한국어/영어 자막을 찾지 못했습니다. (지원: {', '.join(TRANSCRIPT_LANGS)})"); st.stop()
+        except VideoUnavailable:
+            st.error("영상을 찾을 수 없습니다. 비공개이거나 삭제된 영상일 수 있어요."); st.stop()
+        except (IpBlocked, RequestBlocked):
+            st.error("유튜브가 이 서버의 IP를 차단했습니다. 클라우드 배포 환경이라면 `.env`에 PROXY_URL을 설정하세요."); st.stop()
+        except CouldNotRetrieveTranscript:
+            st.error("자막을 가져오지 못했습니다. 클라우드 서버라면 IP 차단일 수 있어요 (PROXY_URL 설정 필요)."); st.stop()
+        except Exception as e:
+            st.error(f"자막 추출 중 오류가 발생했습니다: {e}"); st.stop()
+
+    st.session_state.segments = segments
+    st.session_state.transcript_text = build_timestamped_text(segments)
+
+    with st.spinner("AI가 요약하는 중... (무료 티어라 조금 걸릴 수 있어요)"):
+        try:
+            st.session_state.summary = model_config.summarize_video(st.session_state.transcript_text)
+            st.session_state.highlights = model_config.extract_highlights(st.session_state.transcript_text)
+        except Exception as e:
+            st.error(f"AI 요약 중 오류: {e}"); st.stop()
 
 
-# -----------------------------------------------------------------------------
-# Step 2: 몬스터 이미지 생성 (OpenAI Images API)
-# -----------------------------------------------------------------------------
-def generate_monster_image(image_prompt: str) -> Image.Image:
-    client = _image_lazy()
-    kwargs: dict[str, Any] = {
-        "model": IMAGE_MODEL,
-        "prompt": image_prompt,
-        "size": "1024x1024",
-        "n": 1,
-    }
-    # dall-e-3은 response_format으로 b64_json 선택 가능. gpt-image-1은 항상 b64_json.
-    if IMAGE_MODEL == "dall-e-3":
-        kwargs["response_format"] = "b64_json"
-        kwargs["style"] = "vivid"
-    resp = client.images.generate(**kwargs)
-    b64 = resp.data[0].b64_json
-    return Image.open(BytesIO(base64.b64decode(b64)))
+# ----------------------------- 본문 -----------------------------
+if st.session_state.summary:
+    vid = st.session_state.video_id
 
+    # 1단: 전체 요약 | 영상 (1:1 균등)
+    c_sum, c_vid = st.columns([1, 1], gap="medium")
+    with c_sum:
+        with st.container(border=True):
+            st.markdown('<div class="card-head">✨ 전체 요약</div>', unsafe_allow_html=True)
+            st.markdown(st.session_state.summary)
+    with c_vid:
+        with st.container(border=True):
+            st.video(f"https://www.youtube.com/watch?v={vid}")
 
-# -----------------------------------------------------------------------------
-# Step 3: 카드 마크다운 렌더링
-# -----------------------------------------------------------------------------
-def card_to_markdown(card: dict[str, Any]) -> str:
-    name = card.get("monster_name", "이름 없는 몬스터")
-    species = card.get("monster_species", "")
-    stress_type = card.get("stress_type", "")
-    try:
-        idx = int(card.get("stress_index", 0))
-    except (TypeError, ValueError):
-        idx = 0
-    idx = max(0, min(idx, 10))
-    bar = "█" * idx + "░" * (10 - idx)
+    # 2단: 타임스탬프 핵심 | Q&A
+    c_ts, c_qa = st.columns(2, gap="medium")
 
-    lines = [
-        f"## 🪪 {name}",
-        f"**종족**: {species}  ·  **유형**: {stress_type}",
-        f"**스트레스 지수** `{idx}/10`  {bar}",
-        "",
-        "**특징**",
+    with c_ts:
+        with st.container(border=True):
+            st.markdown('<div class="card-head">🕒 타임스탬프별 핵심 내용</div>', unsafe_allow_html=True)
+            hls = st.session_state.highlights or []
+            if hls:
+                rows = ""
+                for h in hls:
+                    label = fmt_time(h["start"])
+                    link = f"https://www.youtube.com/watch?v={vid}&t={h['start']}s"
+                    rows += (
+                        f'<div class="ts-row">'
+                        f'<a class="ts-time" href="{link}" target="_blank">{label}</a>'
+                        f'<span class="ts-text">{esc(h["point"])}</span>'
+                        f'</div>'
+                    )
+                st.markdown(rows, unsafe_allow_html=True)
+            else:
+                st.caption("타임스탬프 핵심을 생성하지 못했어요. 다시 시도해보세요.")
+
+    with c_qa:
+        with st.container(border=True):
+            st.markdown('<div class="card-head">💬 영상과 대화하기 (Q&A)</div>', unsafe_allow_html=True)
+
+            bubbles = '<div class="bubbles">'
+            if not st.session_state.chat:
+                bubbles += '<div class="bubble-row bot"><div class="bubble bot">영상 내용에 대해 무엇이든 물어보세요. 자막에 근거해 답합니다.</div></div>'
+            for turn in st.session_state.chat:
+                role = "user" if turn["role"] == "user" else "bot"
+                bubbles += (
+                    f'<div class="bubble-row {role}"><div class="bubble {role}">'
+                    f'{esc(turn["content"])}</div></div>'
+                )
+            bubbles += "</div>"
+            st.markdown(bubbles, unsafe_allow_html=True)
+
+            with st.form("qa_form", clear_on_submit=True):
+                fcol, bcol = st.columns([5, 1], vertical_alignment="bottom")
+                with fcol:
+                    q = st.text_input(
+                        "질문", placeholder="질문을 입력하세요...", label_visibility="collapsed"
+                    )
+                with bcol:
+                    sent = st.form_submit_button("➤", use_container_width=True)
+
+            if sent and q:
+                st.session_state.chat.append({"role": "user", "content": q})
+                try:
+                    ans = model_config.answer_question(
+                        st.session_state.transcript_text, q, st.session_state.chat[:-1]
+                    )
+                except Exception as e:
+                    ans = f"답변 중 오류가 발생했습니다: {e}"
+                st.session_state.chat.append({"role": "assistant", "content": ans})
+                st.rerun()
+
+else:
+    # 빈 화면 — 썸네일 왼쪽의 3개 기능 소개 카드
+    f1, f2, f3 = st.columns(3, gap="medium")
+    feats = [
+        (f1, "📄", "AI 요약", "핵심 내용을 깔끔하게 요약해 드립니다."),
+        (f2, "🕒", "타임스탬프 핵심 정리", "중요한 내용이 언제 나오는지 확인하세요."),
+        (f3, "💬", "영상과 대화하기 (Q&A)", "영상 내용을 기반으로 궁금한 점을 물어보세요."),
     ]
-    for t in card.get("traits", []):
-        lines.append(f"- {t}")
-    weakness = card.get("weakness")
-    if weakness:
-        lines.append("")
-        lines.append(f"**약점 (= 너의 무기)**: {weakness}")
-    description = card.get("description")
-    if description:
-        lines.append("")
-        lines.append(f"> {description}")
-    return "\n".join(lines)
-
-
-# -----------------------------------------------------------------------------
-# Step 4: Gradio 콜백
-# -----------------------------------------------------------------------------
-def summon_monster(stress_text: str):
-    if not stress_text or len(stress_text.strip()) < 5:
-        return None, "⚠️ 스트레스를 한 문장 이상 적어주세요.", {}
-
-    # Step 1: 스트레스 분석
-    try:
-        card = analyze_stress(stress_text)
-    except openai.RateLimitError as e:
-        toast, md = format_quota_message(e)
-        gr.Warning(toast)
-        return None, md, {"error": str(e)[:300]}
-    except Exception as e:
-        return (
-            None,
-            f"## ❌ 분석 실패\n\n`{type(e).__name__}`: {str(e)[:200]}",
-            {"error": str(e)[:300]},
-        )
-
-    # Step 2: 몬스터 이미지 생성
-    fallback_prompt = (
-        "a cute chibi stress monster, kawaii, pastel colors, "
-        "white background, full body, cute cartoon"
-    )
-    try:
-        image = generate_monster_image(card.get("image_prompt") or fallback_prompt)
-    except openai.RateLimitError as e:
-        toast, md_quota = format_quota_message(e)
-        gr.Warning(toast)
-        # 분석 카드 + 이미지 한도 메시지 같이 보여줌
-        md = card_to_markdown(card) + "\n\n---\n\n" + md_quota
-        return None, md, card
-    except Exception as e:
-        card["image_error"] = f"{type(e).__name__}: {str(e)[:120]}"
-        return None, card_to_markdown(card), card
-
-    return image, card_to_markdown(card), card
-
-
-# -----------------------------------------------------------------------------
-# Step 5: UI
-# -----------------------------------------------------------------------------
-def build_ui() -> gr.Blocks:
-    with gr.Blocks(title="나의 스트레스 몬스터", theme=gr.themes.Soft()) as demo:
-        gr.Markdown(
-            "# 👿 나의 스트레스 몬스터\n"
-            "오늘 너를 괴롭히는 스트레스를 한 문장 이상 적어줘.  \n"
-            "AI가 그 녀석의 정체를 밝히고 캐릭터 카드를 만들어줄게."
-        )
-        with gr.Row():
-            with gr.Column(scale=1):
-                stress_input = gr.Textbox(
-                    label="오늘의 스트레스",
-                    lines=6,
-                    placeholder=(
-                        "예) 내일까지 발표 자료 만들어야 하는데 한 글자도 못 썼어. "
-                        "머리는 멍하고 자꾸 유튜브만 봐..."
-                    ),
+    for col, ico, title, desc in feats:
+        with col:
+            with st.container(border=True):
+                st.markdown(
+                    f'<div class="feat"><div class="feat-ico">{ico}</div>'
+                    f'<div class="feat-title">{title}</div>'
+                    f'<div class="feat-desc">{desc}</div></div>',
+                    unsafe_allow_html=True,
                 )
-                submit = gr.Button("🔮 몬스터 생성하기", variant="primary")
-                gr.Examples(
-                    examples=[
-                        "팀장님이 자꾸 일을 막판에 던져. 퇴근 30분 전마다 새로운 일이 떨어져서 도저히 정시퇴근을 못해.",
-                        "시험 D-3인데 책도 안 폈어. 자꾸 SNS만 보다가 새벽 3시야.",
-                        "친구한테 답장이 안 와. 내가 뭐 잘못한 건가 계속 카톡 다시 읽어보게 돼.",
-                    ],
-                    inputs=stress_input,
-                )
-            with gr.Column(scale=1):
-                image_out = gr.Image(label="스트레스 몬스터", type="pil")
-                card_md = gr.Markdown()
-                with gr.Accordion("🛠️ 분석 원본 JSON", open=False):
-                    debug = gr.JSON(label="raw card")
-
-        submit.click(
-            fn=summon_monster,
-            inputs=stress_input,
-            outputs=[image_out, card_md, debug],
-        )
-    return demo
 
 
-# 모듈 레벨 demo (Space/HF 런타임 호환)
-demo = build_ui()
-
-if __name__ == "__main__":
-    is_space = bool(os.getenv("SPACE_ID"))
-    demo.launch(
-        server_name="0.0.0.0" if is_space else "127.0.0.1",
-        server_port=int(os.getenv("PORT", 7860)),
-        show_api=False,
-        ssr_mode=False,
-    )
+# ----------------------------- 하단 기능 칩 -----------------------------
+st.markdown(
+    f"""
+    <div class="chips">
+        <span>✨ AI Powered (Gemini · {esc(model_config.GEMINI_MODEL)})</span>
+        <span>📄 자막 기반 분석</span>
+        <span>🛡️ 빠르고 정확한 요약</span>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)

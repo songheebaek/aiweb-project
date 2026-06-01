@@ -1,21 +1,18 @@
-# 11주차 CI/CD: GitHub push → Oracle E2.1.Micro 자동 배포
-# 10주차 칼로리카운터 deploy.yml 그대로 재활용. 경로/컨테이너 이름만 변경.
-# Secrets 4개(SSH_HOST, SSH_USER, SSH_KEY, OPENAI_API_KEY) 등록 후 작동.
+# CI/CD: GitHub push → Oracle E2.1.Micro 자동 배포
+# 기존 스트레스 몬스터 deploy.yml을 YouTube 요약기(Streamlit, 포트 8501)에 맞게 갱신.
+# Secrets 3개(SSH_HOST, SSH_USER, SSH_KEY) 사용. (API 키는 서버의 .env에 직접 보관)
 #
 # 작동 흐름:
 #   학생이 main 브랜치에 push
 #   → ubuntu-latest 러너 부팅
 #   → SSH로 Oracle 서버 접속
-#   → /home/ubuntu/stress-monster 에서 git pull
-#   → docker compose 새 이미지 빌드·재기동
-#   → <id>-demo.aiweb2026.site 즉시 반영
+#   → /home/ubuntu/stress-monster 에서 git pull (※ 디렉터리명은 레거시, repo 체크아웃 위치일 뿐)
+#   → docker compose 새 이미지 빌드·재기동 (옛 컨테이너는 --remove-orphans로 정리)
+#   → s21-demo.aiweb2026.site 즉시 반영
 #
-# 사전 1회 서버 설정:
-#   ssh ubuntu@<서버IP>
-#   mkdir -p /home/ubuntu/stress-monster && cd /home/ubuntu/stress-monster
-#   git clone https://github.com/<학생>/stress-monster.git .
-#   echo "OPENAI_API_KEY=sk-..." > .env && chmod 600 .env
-#   docker compose up -d --build
+# ※ 서버 1회 준비 (Actions가 못 하는 부분):
+#   1) /home/ubuntu/stress-monster/.env 를 GOOGLE_API_KEY + GEMINI_MODEL 로 교체
+#   2) nginx proxy_pass 를 7860 → 8501 로 바꾸고 reload
 
 name: Deploy to Oracle E2.1.Micro
 
@@ -68,12 +65,16 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
 
-            echo "▶ 새 이미지 빌드 + 컨테이너 재기동"
-            docker compose up -d --build
+            # 옛 stress-monster(Gradio, 7860) 컨테이너가 남아 있으면 정리
+            echo "▶ 옛 컨테이너 정리"
+            docker rm -f stress-monster 2>/dev/null || true
 
-            echo "▶ 헬스체크 대기 (최대 60초)"
+            echo "▶ 새 이미지 빌드 + 컨테이너 재기동"
+            docker compose up -d --build --remove-orphans
+
+            echo "▶ 헬스체크 대기 (최대 60초, Streamlit 8501)"
             for i in {1..12}; do
-              if curl -fsS -o /dev/null http://127.0.0.1:7860/; then
+              if curl -fsS -o /dev/null http://127.0.0.1:8501/_stcore/health; then
                 echo "✅ 컨테이너 응답 확인"
                 break
               fi
@@ -82,12 +83,12 @@ jobs:
             done
 
             echo "▶ 최종 상태"
-            docker ps --filter "name=stress-monster" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+            docker ps --filter "name=youtube-summarizer" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
             echo "✅ 배포 완료: $(date)"
 
-      - name: 4. 배포 실패 시 로그 알림 (선택)
+      - name: 4. 배포 실패 시 로그 안내
         if: failure()
         run: |
           echo "❌ 배포 실패. Oracle 서버에 SSH 접속해서 로그 확인:"
           echo "  ssh ubuntu@${{ secrets.SSH_HOST }}"
-          echo "  docker compose logs --tail=100 stress-monster"
+          echo "  docker compose logs --tail=100 youtube-summarizer"

@@ -1,23 +1,19 @@
-# 11주차 스트레스 몬스터(Gradio 5 + LangChain + HF Inference) → Oracle E2.1.Micro 배포용 이미지
-# 10주차 칼로리카운터 zip의 Dockerfile 그대로 재활용. 콘텐츠만 스트레스 몬스터로 교체.
+# YouTube 영상 요약기 (Streamlit + Gemini) → Oracle E2.1.Micro 배포용 이미지
+# week10/스트레스 몬스터 Dockerfile 패턴 재활용. 런타임만 Gradio→Streamlit으로 교체.
 #
-# 빌드:   docker build -t stress-monster:latest .
-# 실행:   docker run -d -p 7860:7860 --env-file .env stress-monster:latest
-# (compose 사용 권장 → docker-compose.yml 참조)
+# 빌드:  docker build -t youtube-summarizer:latest .
+# 실행:  docker run -d -p 8501:8501 --env-file .env youtube-summarizer:latest
+# (compose 권장 → docker-compose.yml 참조)
 
 FROM python:3.11-slim
 
-# 시스템 의존성 (Pillow JPEG/PNG 디코딩용 — 생성된 몬스터 이미지 처리)
 RUN apt-get update \
- && apt-get install -y --no-install-recommends \
-        libjpeg62-turbo \
-        libpng16-16 \
-        ca-certificates \
+ && apt-get install -y --no-install-recommends ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# 의존성 먼저 설치 (캐시 최적화: requirements.txt만 안 바뀌면 이 레이어 재사용)
+# 의존성 먼저 (레이어 캐시)
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip \
  && pip install --no-cache-dir -r requirements.txt
@@ -25,20 +21,17 @@ RUN pip install --no-cache-dir --upgrade pip \
 # 앱 소스
 COPY app.py model_config.py ./
 
-EXPOSE 7860
+EXPOSE 8501
 
-# 환경변수
-# - SPACE_ID: app.py의 is_space 분기를 트리거 → server_name="0.0.0.0" 바인딩
-#             (원래 HF Space 환경 감지용. Docker에서도 동일 효과로 재활용)
-# - GRADIO_SERVER_NAME: 방어적으로 추가 (Gradio가 미래에 explicit param 없으면 이걸로 fallback)
-# - PYTHONUNBUFFERED: print/log 즉시 stdout (docker logs로 실시간 확인용)
-ENV SPACE_ID=docker-oracle \
-    GRADIO_SERVER_NAME=0.0.0.0 \
-    GRADIO_SERVER_PORT=7860 \
-    PYTHONUNBUFFERED=1
+ENV PYTHONUNBUFFERED=1
 
-# 헬스체크 (1GB RAM에서 OOM으로 죽으면 docker가 재기동)
-HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:7860/').read()" || exit 1
+# Streamlit 헬스 엔드포인트로 헬스체크 (1GB RAM에서 죽으면 docker 재기동)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health').read()" || exit 1
 
-CMD ["python", "app.py"]
+# 0.0.0.0 바인딩 + headless (서버 환경에서 브라우저 자동실행/통계수집 끔)
+CMD ["streamlit", "run", "app.py", \
+     "--server.address=0.0.0.0", \
+     "--server.port=8501", \
+     "--server.headless=true", \
+     "--browser.gatherUsageStats=false"]
