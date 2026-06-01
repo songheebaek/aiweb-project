@@ -17,10 +17,12 @@
 name: Deploy to Oracle E2.1.Micro
 
 on:
-  push:
-    branches:
-      - main
-  workflow_dispatch:                # 수동 트리거 옵션 (Actions 탭에서 "Run workflow" 버튼)
+  # ⏸️ Oracle 인프라 재구성 전까지 push 자동배포 비활성화 (서버 다운 상태 → 실패 런만 쌓임).
+  #    Oracle 복구 후 아래 push 블록 주석을 해제하면 main push 시 자동배포가 재개됨.
+  # push:
+  #   branches:
+  #     - main
+  workflow_dispatch:                # 수동 트리거 (Oracle 복구 후 Actions 탭 "Run workflow"로도 배포 가능)
 
 jobs:
   deploy:
