@@ -284,7 +284,7 @@ if st.session_state.summary:
                 st.markdown('<div class="card-head">✨ 전체 요약</div>', unsafe_allow_html=True)
             with h_btn:
                 st.download_button(
-                    "⬇",
+                    ":material/download:",
                     data=build_report(vid, st.session_state.summary, st.session_state.highlights),
                     file_name=f"summary_{vid}.txt",
                     mime="text/plain",
