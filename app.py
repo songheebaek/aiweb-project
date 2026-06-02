@@ -145,6 +145,8 @@ st.markdown(
         padding: 6px 10px;
     }
     .card-head { font-size: 1.12rem; font-weight: 700; color: #1f2438; margin: 4px 2px 12px; }
+    /* 전체 요약 박스: 영상과 같은 16:9 비율 → 화면 폭과 무관하게 영상 높이와 자동 일치 (내용 길면 스크롤) */
+    .st-key-summary_card { aspect-ratio: 16 / 9; overflow-y: auto; }
 
     /* ----- 기능 카드 (빈 화면) ----- */
     .feat { text-align: left; padding-bottom: 14px; }
@@ -272,12 +274,10 @@ if analyze:
 if st.session_state.summary:
     vid = st.session_state.video_id
 
-    # 1단: 전체 요약 | 영상
-    # 영상 박스는 자동 높이(영상에 딱 맞게 → 위아래 여백 균등), 요약 박스는 영상 높이에 맞춰 고정.
-    SUMMARY_H = 310
+    # 1단: 전체 요약 | 영상 — 둘 다 16:9라 화면 폭과 무관하게 높이가 자동으로 같아짐.
     c_sum, c_vid = st.columns([1, 1], gap="medium")
     with c_sum:
-        with st.container(height=SUMMARY_H, border=True):
+        with st.container(key="summary_card", border=True):
             # 헤더 행: 제목(좌) + 아이콘 다운로드 버튼(우측 상단)
             h_title, h_btn = st.columns([6, 1], vertical_alignment="center")
             with h_title:
