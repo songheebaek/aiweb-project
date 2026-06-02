@@ -110,7 +110,7 @@ def ai_error_msg(e: Exception) -> str:
 
 # ----------------------------- 페이지 설정 + 스타일 -----------------------------
 st.set_page_config(
-    page_title="YouTube Summarizer",
+    page_title="AI YouTube Summarizer",
     page_icon="🎬",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -121,11 +121,8 @@ st.markdown(
     <style>
     /* ----- 전체 배경 / 여백 ----- */
     .stApp { background: linear-gradient(180deg, #f7f8fc 0%, #eef0f8 100%); }
-    /* Streamlit 기본 상단 헤더/툴바/메뉴/푸터 숨김 (대표 사이트용 깔끔 처리, 제목 겹침 방지) */
-    header[data-testid="stHeader"] { display: none; }
-    [data-testid="stToolbar"] { display: none; }
-    #MainMenu, footer { visibility: hidden; }
-    .block-container { padding-top: 2.8rem; padding-bottom: 1rem; max-width: 1180px; }
+    /* Streamlit 기본 헤더/메뉴(다크·라이트 토글 등)는 유지. 제목과 안 겹치게 상단 여백만 확보. */
+    .block-container { padding-top: 4.5rem; padding-bottom: 1rem; max-width: 1180px; }
 
     /* ----- 헤더 ----- */
     .hero { display: flex; align-items: center; gap: 18px; margin-bottom: 4px; }
@@ -139,7 +136,7 @@ st.markdown(
         border-color: transparent transparent transparent #fff; margin-left: 4px;
     }
     .hero-title { font-size: 2.6rem; font-weight: 800; line-height: 1.05; color: #15182b; letter-spacing: -1px; }
-    .hero-sub { font-size: 1.05rem; color: #6b7392; margin: 8px 0 22px 2px; font-weight: 500; }
+    .hero-sub { font-size: 1.05rem; color: #6b7392; margin: 14px 0 22px 82px; font-weight: 500; }
 
     /* ----- 카드 (st.container border 보강) ----- */
     div[data-testid="stVerticalBlockBorderWrapper"] {
@@ -213,10 +210,10 @@ st.markdown(
     <div class="hero">
         <div class="yt-logo"></div>
         <div>
-            <div class="hero-title">YouTube Summarizer</div>
+            <div class="hero-title">AI YouTube Summarizer</div>
         </div>
     </div>
-    <div class="hero-sub">긴 영상을 빠르게 이해하는 가장 스마트한 방법</div>
+    <div class="hero-sub">영상의 핵심을 빠르게 파악하고, 궁금한 것은 바로 물어보세요</div>
     """,
     unsafe_allow_html=True,
 )
@@ -276,7 +273,7 @@ if st.session_state.summary:
     vid = st.session_state.video_id
 
     # 1단: 전체 요약 | 영상 — 두 박스를 같은 높이로 통일 (하단 라인 정렬)
-    CARD_H = 360
+    CARD_H = 320
     c_sum, c_vid = st.columns([1, 1], gap="medium")
     with c_sum:
         with st.container(height=CARD_H, border=True):
