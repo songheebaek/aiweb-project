@@ -95,7 +95,11 @@ st.markdown(
     <style>
     /* ----- 전체 배경 / 여백 ----- */
     .stApp { background: linear-gradient(180deg, #f7f8fc 0%, #eef0f8 100%); }
-    .block-container { padding-top: 2.2rem; padding-bottom: 1rem; max-width: 1180px; }
+    /* Streamlit 기본 상단 헤더/툴바/메뉴/푸터 숨김 (대표 사이트용 깔끔 처리, 제목 겹침 방지) */
+    header[data-testid="stHeader"] { display: none; }
+    [data-testid="stToolbar"] { display: none; }
+    #MainMenu, footer { visibility: hidden; }
+    .block-container { padding-top: 2.8rem; padding-bottom: 1rem; max-width: 1180px; }
 
     /* ----- 헤더 ----- */
     .hero { display: flex; align-items: center; gap: 18px; margin-bottom: 4px; }
