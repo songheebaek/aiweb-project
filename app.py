@@ -82,6 +82,24 @@ def esc(text: str) -> str:
     )
 
 
+def build_report(video_id: str, summary: str, highlights: list) -> str:
+    """요약 + 타임스탬프 핵심을 텍스트 리포트로 (다운로드용)."""
+    lines = [
+        "🎬 YouTube 영상 요약",
+        f"URL: https://www.youtube.com/watch?v={video_id}",
+        "",
+        "=" * 40,
+        "[전체 요약]",
+        summary or "",
+        "",
+        "=" * 40,
+        "[타임스탬프별 핵심]",
+    ]
+    for h in highlights or []:
+        lines.append(f"[{fmt_time(h['start'])}] {h['point']}")
+    return "\n".join(lines)
+
+
 # ----------------------------- 페이지 설정 + 스타일 -----------------------------
 st.set_page_config(
     page_title="YouTube Summarizer",
@@ -146,11 +164,13 @@ st.markdown(
     .bubble.bot { background: #f4f5f9; color: #2b3047; border-bottom-left-radius: 5px; }
 
     /* ----- 버튼: 보라색 ----- */
-    .stButton > button, .stFormSubmitButton > button {
+    .stButton > button, .stFormSubmitButton > button, .stDownloadButton > button {
         background: #6c5ce7; color: #fff; border: none; border-radius: 12px;
         font-weight: 700; padding: .55rem 1.1rem;
     }
-    .stButton > button:hover, .stFormSubmitButton > button:hover { background: #5a4bd4; color: #fff; }
+    .stButton > button:hover, .stFormSubmitButton > button:hover, .stDownloadButton > button:hover {
+        background: #5a4bd4; color: #fff;
+    }
 
     /* ----- 입력창 ----- */
     .stTextInput input { border-radius: 12px; }
@@ -251,8 +271,21 @@ if st.session_state.summary:
     c_sum, c_vid = st.columns([1, 1], gap="medium")
     with c_sum:
         with st.container(border=True):
-            st.markdown('<div class="card-head">✨ 전체 요약</div>', unsafe_allow_html=True)
-            st.markdown(st.session_state.summary)
+            # 헤더 행: 제목(좌) + 텍스트 다운로드 버튼(우측 상단)
+            h_title, h_btn = st.columns([2, 1], vertical_alignment="center")
+            with h_title:
+                st.markdown('<div class="card-head">✨ 전체 요약</div>', unsafe_allow_html=True)
+            with h_btn:
+                st.download_button(
+                    "⬇ 텍스트 저장",
+                    data=build_report(vid, st.session_state.summary, st.session_state.highlights),
+                    file_name=f"summary_{vid}.txt",
+                    mime="text/plain",
+                    use_container_width=True,
+                )
+            # 고정 높이 스크롤 영역 (박스 크기 축소 + 내용은 스크롤로)
+            with st.container(height=240, border=False):
+                st.markdown(st.session_state.summary)
     with c_vid:
         with st.container(border=True):
             st.video(f"https://www.youtube.com/watch?v={vid}")
