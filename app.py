@@ -272,11 +272,12 @@ if analyze:
 if st.session_state.summary:
     vid = st.session_state.video_id
 
-    # 1단: 전체 요약 | 영상 — 두 박스를 같은 높이로 통일 (하단 라인 정렬)
-    CARD_H = 320
+    # 1단: 전체 요약 | 영상
+    # 영상 박스는 자동 높이(영상에 딱 맞게 → 위아래 여백 균등), 요약 박스는 영상 높이에 맞춰 고정.
+    SUMMARY_H = 310
     c_sum, c_vid = st.columns([1, 1], gap="medium")
     with c_sum:
-        with st.container(height=CARD_H, border=True):
+        with st.container(height=SUMMARY_H, border=True):
             # 헤더 행: 제목(좌) + 아이콘 다운로드 버튼(우측 상단)
             h_title, h_btn = st.columns([6, 1], vertical_alignment="center")
             with h_title:
@@ -292,7 +293,7 @@ if st.session_state.summary:
                 )
             st.markdown(st.session_state.summary)
     with c_vid:
-        with st.container(height=CARD_H, border=True):
+        with st.container(border=True):
             st.video(f"https://www.youtube.com/watch?v={vid}")
 
     # 2단: 타임스탬프 핵심 | Q&A
