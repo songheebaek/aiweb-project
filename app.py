@@ -147,7 +147,7 @@ st.markdown(
     .card-head { font-size: 1.12rem; font-weight: 700; color: #1f2438; margin: 4px 2px 12px; }
 
     /* ----- 기능 카드 (빈 화면) ----- */
-    .feat { text-align: left; }
+    .feat { text-align: left; padding-bottom: 14px; }
     .feat-ico { font-size: 1.6rem; }
     .feat-title { font-size: 1.08rem; font-weight: 700; color: #1f2438; margin-top: 6px; }
     .feat-desc { font-size: .92rem; color: #6b7392; margin-top: 4px; line-height: 1.45; }
