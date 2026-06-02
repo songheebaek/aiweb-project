@@ -263,7 +263,7 @@ if analyze:
     st.session_state.segments = segments
     st.session_state.transcript_text = build_timestamped_text(segments)
 
-    with st.spinner("AI가 요약하는 중... (무료 티어라 조금 걸릴 수 있어요)"):
+    with st.spinner("AI가 요약하는 중... (조금 걸릴 수 있어요)"):
         try:
             st.session_state.summary = model_config.summarize_video(st.session_state.transcript_text)
             st.session_state.highlights = model_config.extract_highlights(st.session_state.transcript_text)
@@ -275,27 +275,27 @@ if analyze:
 if st.session_state.summary:
     vid = st.session_state.video_id
 
-    # 1단: 전체 요약 | 영상 (1:1 균등)
+    # 1단: 전체 요약 | 영상 — 두 박스를 같은 높이로 통일 (하단 라인 정렬)
+    CARD_H = 360
     c_sum, c_vid = st.columns([1, 1], gap="medium")
     with c_sum:
-        with st.container(border=True):
-            # 헤더 행: 제목(좌) + 텍스트 다운로드 버튼(우측 상단)
-            h_title, h_btn = st.columns([2, 1], vertical_alignment="center")
+        with st.container(height=CARD_H, border=True):
+            # 헤더 행: 제목(좌) + 아이콘 다운로드 버튼(우측 상단)
+            h_title, h_btn = st.columns([6, 1], vertical_alignment="center")
             with h_title:
                 st.markdown('<div class="card-head">✨ 전체 요약</div>', unsafe_allow_html=True)
             with h_btn:
                 st.download_button(
-                    "⬇ 텍스트 저장",
+                    "⬇",
                     data=build_report(vid, st.session_state.summary, st.session_state.highlights),
                     file_name=f"summary_{vid}.txt",
                     mime="text/plain",
+                    help="요약을 텍스트 파일로 저장",
                     use_container_width=True,
                 )
-            # 고정 높이 스크롤 영역 (박스 크기 축소 + 내용은 스크롤로)
-            with st.container(height=240, border=False):
-                st.markdown(st.session_state.summary)
+            st.markdown(st.session_state.summary)
     with c_vid:
-        with st.container(border=True):
+        with st.container(height=CARD_H, border=True):
             st.video(f"https://www.youtube.com/watch?v={vid}")
 
     # 2단: 타임스탬프 핵심 | Q&A
