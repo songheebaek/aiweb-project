@@ -18,6 +18,10 @@ _RETRYABLE = {429, 500, 503}
 # 무료 티어 모델. 기본 gemini-2.5-flash. 다른 모델로 바꾸려면 .env의 GEMINI_MODEL 사용.
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
+# 기본 모델이 503(과부하)로 계속 실패하면 폴백할 모델들 (둘 다 무료 티어).
+_FALLBACK_MODELS = [m for m in [GEMINI_MODEL, "gemini-2.0-flash"] if m]
+_FALLBACK_MODELS = list(dict.fromkeys(_FALLBACK_MODELS))  # 중복 제거(순서 유지)
+
 # Gemini Flash 컨텍스트는 100만 토큰 → 웬만한 장편 영상 자막도 통째로 들어감.
 # 따라서 청크 분할 없이 전체 자막을 한 번에 전달.
 
@@ -41,24 +45,33 @@ def get_client():
 
 
 def _generate(prompt: str, as_json: bool = False, retries: int = 3) -> str:
-    """프롬프트 → Gemini 응답 텍스트. 일시적 503/429는 백오프 후 재시도."""
+    """프롬프트 → Gemini 응답 텍스트.
+
+    일시적 503/429는 백오프 후 재시도하고, 한 모델이 계속 과부하면 다음 폴백 모델로 전환.
+    인증/요청 오류(비재시도성)는 즉시 실패.
+    """
     client = get_client()
     config = (
         types.GenerateContentConfig(response_mime_type="application/json")
         if as_json
         else None
     )
-    for attempt in range(retries):
-        try:
-            resp = client.models.generate_content(
-                model=GEMINI_MODEL, contents=prompt, config=config
-            )
-            return resp.text
-        except genai_errors.APIError as e:
-            if getattr(e, "code", None) in _RETRYABLE and attempt < retries - 1:
-                time.sleep(2 * (attempt + 1))  # 2s, 4s 백오프
-                continue
-            raise
+    last_err = None
+    for model in _FALLBACK_MODELS:
+        for attempt in range(retries):
+            try:
+                resp = client.models.generate_content(
+                    model=model, contents=prompt, config=config
+                )
+                return resp.text
+            except genai_errors.APIError as e:
+                last_err = e
+                if getattr(e, "code", None) not in _RETRYABLE:
+                    raise  # 인증/요청 오류 등은 모델 바꿔도 동일 → 즉시 실패
+                if attempt < retries - 1:
+                    time.sleep(2 * (attempt + 1))  # 2s, 4s 백오프
+        # 이 모델에서 재시도 소진(계속 503/429) → 다음 폴백 모델 시도
+    raise last_err
 
 
 def summarize_video(transcript_text: str) -> str:

@@ -100,6 +100,14 @@ def build_report(video_id: str, summary: str, highlights: list) -> str:
     return "\n".join(lines)
 
 
+def ai_error_msg(e: Exception) -> str:
+    """AI 호출 오류를 사용자 친화적 한국어 메시지로."""
+    s = str(e)
+    if any(k in s for k in ("503", "UNAVAILABLE", "high demand", "429", "overloaded")):
+        return "지금 Gemini 서버가 일시적으로 혼잡해요(과부하). 잠시 후 다시 시도해주세요. 🙏"
+    return f"AI 처리 중 오류가 발생했습니다: {e}"
+
+
 # ----------------------------- 페이지 설정 + 스타일 -----------------------------
 st.set_page_config(
     page_title="YouTube Summarizer",
@@ -260,7 +268,7 @@ if analyze:
             st.session_state.summary = model_config.summarize_video(st.session_state.transcript_text)
             st.session_state.highlights = model_config.extract_highlights(st.session_state.transcript_text)
         except Exception as e:
-            st.error(f"AI 요약 중 오류: {e}"); st.stop()
+            st.error(ai_error_msg(e)); st.stop()
 
 
 # ----------------------------- 본문 -----------------------------
@@ -344,7 +352,7 @@ if st.session_state.summary:
                         st.session_state.transcript_text, q, st.session_state.chat[:-1]
                     )
                 except Exception as e:
-                    ans = f"답변 중 오류가 발생했습니다: {e}"
+                    ans = ai_error_msg(e)
                 st.session_state.chat.append({"role": "assistant", "content": ans})
                 st.rerun()
 
