@@ -139,8 +139,8 @@ st.markdown(
     /* Streamlit 기본 헤더/메뉴(다크·라이트 토글 등)는 유지. 제목과 안 겹치게 상단 여백만 확보. */
     .block-container { padding-top: 4.5rem; padding-bottom: 1rem; max-width: 1180px; }
 
-    /* ----- 헤더 (좌측 정렬, 로고는 제목+부제목 세로 중앙) ----- */
-    .hero { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
+    /* ----- 헤더 (가운데 정렬, 로고는 제목+부제목 세로 중앙) ----- */
+    .hero { display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 24px; }
     .hero-logo {
         width: 64px; height: 46px; flex-shrink: 0;
         background: linear-gradient(135deg, #9b8cff 0%, #6c5ce7 100%);
@@ -207,8 +207,8 @@ st.markdown(
     .ex-head { font-size: .95rem; font-weight: 700; color: #4b5168; margin: 2px 2px 12px; }
     /* 칩 컨테이너(stVerticalBlock)를 가로 flex로 → 칩들이 한 줄에 배치 */
     .st-key-exchips { flex-direction: row !important; flex-wrap: wrap !important;
-        gap: 10px !important; width: 100% !important; align-items: flex-start !important;
-        justify-content: space-between !important; }
+        gap: 14px !important; width: 100% !important; align-items: flex-start !important;
+        justify-content: center !important; }
     .st-key-exchips > [data-testid="stElementContainer"] { width: auto !important; flex: 0 0 auto !important; }
     .st-key-exchips .stButton { width: auto !important; }
     .st-key-exchips .stButton > button {
