@@ -139,19 +139,26 @@ st.markdown(
     /* Streamlit 기본 헤더/메뉴(다크·라이트 토글 등)는 유지. 제목과 안 겹치게 상단 여백만 확보. */
     .block-container { padding-top: 4.5rem; padding-bottom: 1rem; max-width: 1180px; }
 
-    /* ----- 헤더 ----- */
-    .hero { display: flex; align-items: center; gap: 18px; margin-bottom: 4px; }
-    .yt-logo {
-        width: 64px; height: 46px; background: #ff0000; border-radius: 14px;
-        display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-        box-shadow: 0 6px 16px rgba(255,0,0,.25);
+    /* ----- 헤더 (중앙 정렬) ----- */
+    .hero { text-align: center; margin-bottom: 24px; }
+    .hero-row { display: flex; align-items: center; justify-content: center; gap: 16px; }
+    .hero-logo {
+        width: 58px; height: 58px; flex-shrink: 0;
+        background: linear-gradient(135deg, #9b8cff 0%, #6c5ce7 100%);
+        border-radius: 16px; display: flex; align-items: center; justify-content: center;
+        box-shadow: 0 10px 22px rgba(108,92,231,.35);
     }
-    .yt-logo:after {
+    .hero-logo:after {
         content: ""; border-style: solid; border-width: 10px 0 10px 17px;
         border-color: transparent transparent transparent #fff; margin-left: 4px;
     }
-    .hero-title { font-size: 2.6rem; font-weight: 800; line-height: 1.05; color: #15182b; letter-spacing: -1px; }
-    .hero-sub { font-size: 1.05rem; color: #6b7392; margin: 14px 0 22px 82px; font-weight: 500; }
+    .hero-title { font-size: 2.6rem; font-weight: 800; line-height: 1.1; color: #1f2438; letter-spacing: -1px; }
+    .hero-sub { font-size: 1.05rem; color: #7a6ff0; margin-top: 10px; font-weight: 600; }
+
+    /* ----- URL 입력 카드 ----- */
+    .st-key-url_card { padding: 16px 20px !important; margin-bottom: 4px; }
+    .url-label { font-size: 1.05rem; font-weight: 700; color: #1f2438; margin: 2px 2px 12px; }
+    .url-hint { font-size: .9rem; color: #8a86b8; font-weight: 500; margin: 12px 2px 2px; }
 
     /* ----- 카드 (st.container border 보강) ----- */
     div[data-testid="stVerticalBlockBorderWrapper"] {
@@ -243,28 +250,34 @@ for key, default in [
 st.markdown(
     """
     <div class="hero">
-        <div class="yt-logo"></div>
-        <div>
+        <div class="hero-row">
+            <div class="hero-logo"></div>
             <div class="hero-title">AI YouTube Summarizer</div>
         </div>
+        <div class="hero-sub">요약부터 Q&amp;A까지, 영상 이해의 새로운 방식</div>
     </div>
-    <div class="hero-sub">영상의 핵심을 빠르게 파악하고, 궁금한 것은 바로 물어보세요</div>
     """,
     unsafe_allow_html=True,
 )
 
 
-# ----------------------------- URL 입력 바 -----------------------------
-col_url, col_btn = st.columns([6, 1], vertical_alignment="bottom")
-with col_url:
-    url = st.text_input(
-        "URL",
-        placeholder="요약하고 싶은 영상 url을 입력해주세요. (https://www.youtube.com/watch?v=xxxxxxxxx)",
-        label_visibility="collapsed",
-        key="url_input",
+# ----------------------------- URL 입력 카드 -----------------------------
+with st.container(key="url_card", border=True):
+    st.markdown('<div class="url-label">🔗&nbsp; YouTube 영상 URL 입력</div>', unsafe_allow_html=True)
+    col_url, col_btn = st.columns([6, 1], vertical_alignment="bottom")
+    with col_url:
+        url = st.text_input(
+            "URL",
+            placeholder="https://www.youtube.com/watch?v=...",
+            label_visibility="collapsed",
+            key="url_input",
+        )
+    with col_btn:
+        analyze = st.button("✨ 요약하기", type="primary", use_container_width=True)
+    st.markdown(
+        '<div class="url-hint">💡 YouTube 영상의 URL을 입력하면 AI가 핵심 내용을 요약해드려요!</div>',
+        unsafe_allow_html=True,
     )
-with col_btn:
-    analyze = st.button("요약하기", type="primary", use_container_width=True)
 
 
 # ----------------------------- 분석 실행 -----------------------------
