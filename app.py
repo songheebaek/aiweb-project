@@ -137,7 +137,7 @@ st.markdown(
     /* ----- 전체 배경 / 여백 ----- */
     .stApp { background: linear-gradient(180deg, #f7f8fc 0%, #eef0f8 100%); }
     /* Streamlit 기본 헤더/메뉴(다크·라이트 토글 등)는 유지. 제목과 안 겹치게 상단 여백만 확보. */
-    .block-container { padding-top: 4.5rem; padding-bottom: 1rem; max-width: 1180px; }
+    .block-container { padding-top: 4.5rem; padding-bottom: 72px; max-width: 1180px; }
 
     /* ----- 헤더 (가운데 정렬, 로고는 제목+부제목 세로 중앙) ----- */
     .hero { display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 24px; }
@@ -207,7 +207,7 @@ st.markdown(
     .ex-head { font-size: .95rem; font-weight: 700; color: #4b5168; margin: 2px 2px 12px; }
     /* 칩 컨테이너(stVerticalBlock)를 가로 flex로 → 칩들이 한 줄에 배치 */
     .st-key-exchips { flex-direction: row !important; flex-wrap: wrap !important;
-        gap: 14px !important; width: 100% !important; align-items: flex-start !important;
+        gap: 35px !important; width: 100% !important; align-items: flex-start !important;
         justify-content: center !important; }
     .st-key-exchips > [data-testid="stElementContainer"] { width: auto !important; flex: 0 0 auto !important; }
     .st-key-exchips .stButton { width: auto !important; }
@@ -222,9 +222,12 @@ st.markdown(
     }
     .st-key-exchips .stButton > button p { white-space: nowrap; }
 
-    /* ----- 하단 기능 칩 ----- */
-    .chips { display: flex; justify-content: center; gap: 38px; flex-wrap: wrap;
-             margin: 26px 0 6px; color: #5b627e; font-weight: 600; font-size: .95rem; }
+    /* ----- 하단 기능 칩 (고정 푸터) ----- */
+    .chips { position: fixed; left: 0; right: 0; bottom: 0; z-index: 100;
+             display: flex; justify-content: center; gap: 38px; flex-wrap: wrap;
+             padding: 12px 16px; color: #5b627e; font-weight: 600; font-size: .95rem;
+             background: rgba(245,246,251,0.92); backdrop-filter: blur(6px);
+             border-top: 1px solid #e6e8f2; }
     .chips span { display: inline-flex; align-items: center; gap: 8px; }
 
     [data-testid="stMetricValue"] { font-size: 1.3rem; }
