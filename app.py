@@ -170,7 +170,7 @@ st.markdown(
     .st-key-video_card div[data-testid="stVerticalBlock"] { height: 100%; justify-content: center; align-items: center; }
 
     /* ----- 기능 카드 (빈 화면) ----- */
-    .feat { text-align: left; padding-bottom: 14px; }
+    .feat { text-align: center; padding-bottom: 14px; }
     .feat-ico { font-size: 1.6rem; }
     .feat-title { font-size: 1.08rem; font-weight: 700; color: #1f2438; margin-top: 6px; }
     .feat-desc { font-size: .92rem; color: #6b7392; margin-top: 4px; line-height: 1.45; }
