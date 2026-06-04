@@ -154,8 +154,8 @@ st.markdown(
     .hero-title { font-size: 2.6rem; font-weight: 800; line-height: 1.05; color: #1f2438; letter-spacing: -1px; }
     .hero-sub { font-size: 1.05rem; color: #a3a7ba; margin-top: 8px; font-weight: 500; }
 
-    /* ----- URL 입력 카드 / 예시 카드 (같은 너비·패딩) ----- */
-    .st-key-url_card, .st-key-ex_card { padding: 16px 20px !important; margin-bottom: 4px; }
+    /* ----- URL 입력 카드 ----- */
+    .st-key-url_card { padding: 16px 20px !important; margin-bottom: 4px; }
     .url-label { font-size: 1.05rem; font-weight: 700; color: #1f2438; margin: 2px 2px 12px; }
     .url-hint { font-size: .9rem; color: #8a86b8; font-weight: 500; margin: 12px 2px 2px; }
 
@@ -207,7 +207,8 @@ st.markdown(
     .ex-head { font-size: .95rem; font-weight: 700; color: #4b5168; margin: 2px 2px 12px; }
     /* 칩 컨테이너(stVerticalBlock)를 가로 flex로 → 칩들이 한 줄에 배치 */
     .st-key-exchips { flex-direction: row !important; flex-wrap: wrap !important;
-        gap: 10px !important; width: 100% !important; align-items: flex-start !important; }
+        gap: 10px !important; width: 100% !important; align-items: flex-start !important;
+        justify-content: space-between !important; }
     .st-key-exchips > [data-testid="stElementContainer"] { width: auto !important; flex: 0 0 auto !important; }
     .st-key-exchips .stButton { width: auto !important; }
     .st-key-exchips .stButton > button {
@@ -403,19 +404,18 @@ if st.session_state.summary:
 
 else:
     # 빈 화면 — 예시 영상 칩(가로 한 줄, 클릭 시 입력창 자동 입력) + 3개 기능 소개 카드
-    with st.container(key="ex_card", border=True):
-        st.markdown(
-            '<div class="ex-head">▶&nbsp;&nbsp;예시 영상으로 바로 시작해보세요</div>',
-            unsafe_allow_html=True,
-        )
-        with st.container(key="exchips"):
-            for i, ex in enumerate(EXAMPLES, 1):
-                st.button(
-                    f'{ex["icon"]}  {ex["label"]}',
-                    key=f"ex{i}",
-                    on_click=use_example,
-                    args=(ex["url"],),
-                )
+    st.markdown(
+        '<div class="ex-head">▶&nbsp;&nbsp;예시 영상으로 바로 시작해보세요</div>',
+        unsafe_allow_html=True,
+    )
+    with st.container(key="exchips"):
+        for i, ex in enumerate(EXAMPLES, 1):
+            st.button(
+                f'{ex["icon"]}  {ex["label"]}',
+                key=f"ex{i}",
+                on_click=use_example,
+                args=(ex["url"],),
+            )
 
     st.write("")
     f1, f2, f3 = st.columns(3, gap="medium")
