@@ -139,21 +139,20 @@ st.markdown(
     /* Streamlit 기본 헤더/메뉴(다크·라이트 토글 등)는 유지. 제목과 안 겹치게 상단 여백만 확보. */
     .block-container { padding-top: 4.5rem; padding-bottom: 1rem; max-width: 1180px; }
 
-    /* ----- 헤더 (중앙 정렬) ----- */
-    .hero { text-align: center; margin-bottom: 24px; }
-    .hero-row { display: flex; align-items: center; justify-content: center; gap: 16px; }
+    /* ----- 헤더 (좌측 정렬, 로고는 제목+부제목 세로 중앙) ----- */
+    .hero { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
     .hero-logo {
-        width: 58px; height: 58px; flex-shrink: 0;
+        width: 64px; height: 46px; flex-shrink: 0;
         background: linear-gradient(135deg, #9b8cff 0%, #6c5ce7 100%);
-        border-radius: 16px; display: flex; align-items: center; justify-content: center;
-        box-shadow: 0 10px 22px rgba(108,92,231,.35);
+        border-radius: 14px; display: flex; align-items: center; justify-content: center;
+        box-shadow: 0 8px 18px rgba(108,92,231,.32);
     }
     .hero-logo:after {
         content: ""; border-style: solid; border-width: 10px 0 10px 17px;
         border-color: transparent transparent transparent #fff; margin-left: 4px;
     }
-    .hero-title { font-size: 2.6rem; font-weight: 800; line-height: 1.1; color: #1f2438; letter-spacing: -1px; }
-    .hero-sub { font-size: 1.05rem; color: #7a6ff0; margin-top: 10px; font-weight: 600; }
+    .hero-title { font-size: 2.6rem; font-weight: 800; line-height: 1.05; color: #1f2438; letter-spacing: -1px; }
+    .hero-sub { font-size: 1.05rem; color: #a3a7ba; margin-top: 8px; font-weight: 500; }
 
     /* ----- URL 입력 카드 / 예시 카드 (같은 너비·패딩) ----- */
     .st-key-url_card, .st-key-ex_card { padding: 16px 20px !important; margin-bottom: 4px; }
@@ -250,11 +249,11 @@ for key, default in [
 st.markdown(
     """
     <div class="hero">
-        <div class="hero-row">
-            <div class="hero-logo"></div>
+        <div class="hero-logo"></div>
+        <div>
             <div class="hero-title">AI YouTube Summarizer</div>
+            <div class="hero-sub">영상의 핵심을 빠르게 파악하고, 궁금한 것은 바로 물어보세요</div>
         </div>
-        <div class="hero-sub">영상의 핵심을 빠르게 파악하고, 궁금한 것은 바로 물어보세요</div>
     </div>
     """,
     unsafe_allow_html=True,
