@@ -167,7 +167,7 @@ st.markdown(
     }
     .card-head { font-size: 1.12rem; font-weight: 700; color: #1f2438; margin: 4px 2px 12px; }
     /* 요약·영상 박스를 같은 고정 높이로(아래 N) → 항상 같은 크기. 영상은 박스 안에서 세로 중앙 정렬. */
-    .st-key-video_card div[data-testid="stVerticalBlock"] { height: 100%; justify-content: center; }
+    .st-key-video_card div[data-testid="stVerticalBlock"] { height: 100%; justify-content: center; align-items: center; }
 
     /* ----- 기능 카드 (빈 화면) ----- */
     .feat { text-align: left; padding-bottom: 14px; }
