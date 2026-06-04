@@ -178,7 +178,7 @@ st.markdown(
     /* ----- 타임스탬프 행 ----- */
     .ts-row { display: flex; gap: 14px; padding: 9px 4px; border-bottom: 1px solid #f1f2f8; }
     .ts-row:last-child { border-bottom: none; }
-    .ts-time { color: #16a34a; font-weight: 700; font-variant-numeric: tabular-nums;
+    .ts-time { color: #18cf15; font-weight: 700; font-variant-numeric: tabular-nums;
                text-decoration: none; flex-shrink: 0; min-width: 52px; }
     .ts-time:hover { text-decoration: underline; }
     .ts-text { color: #2b3047; font-size: .96rem; line-height: 1.4; }
