@@ -5,4 +5,3 @@ streamlit>=1.40,<2
 google-genai>=1.0                 # Gemini API SDK (구 google-generativeai는 EOL → 신 SDK)
 youtube-transcript-api>=1.2,<2    # 자막 추출 (1.x 인스턴스 API: .fetch() / to_raw_data())
 python-dotenv>=1.0
-requests>=2.31                     # 예시 영상 제목 oEmbed 조회 (youtube-transcript-api 의존성이지만 직접 사용해 명시)
