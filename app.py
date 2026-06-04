@@ -35,7 +35,7 @@ TRANSCRIPT_LANGS = ["ko", "en"]
 EXAMPLES = [
     {"url": "https://www.youtube.com/watch?v=CDTEtw90G04", "icon": "🖥️", "label": "AI 코딩"},
     {"url": "https://www.youtube.com/watch?v=7p3w7fveSJk", "icon": "🎨", "label": "디자인 코딩"},
-    {"url": "https://www.youtube.com/watch?v=wCYCYfNNGUM", "icon": "🤖", "label": "AI 미래"},
+    {"url": "https://www.youtube.com/watch?v=wCYCYfNNGUM", "icon": "🔮", "label": "AI 미래"},
     {"url": "https://www.youtube.com/watch?v=2eqPBLgVH0U&t=192s", "icon": "📚", "label": "클로드 개념"},
     {"url": "https://www.youtube.com/watch?v=7OUWELKUac4&t=1202s", "icon": "🦾", "label": "로봇 산업"},
 ]
@@ -155,8 +155,8 @@ st.markdown(
     .hero-title { font-size: 2.6rem; font-weight: 800; line-height: 1.1; color: #1f2438; letter-spacing: -1px; }
     .hero-sub { font-size: 1.05rem; color: #7a6ff0; margin-top: 10px; font-weight: 600; }
 
-    /* ----- URL 입력 카드 ----- */
-    .st-key-url_card { padding: 16px 20px !important; margin-bottom: 4px; }
+    /* ----- URL 입력 카드 / 예시 카드 (같은 너비·패딩) ----- */
+    .st-key-url_card, .st-key-ex_card { padding: 16px 20px !important; margin-bottom: 4px; }
     .url-label { font-size: 1.05rem; font-weight: 700; color: #1f2438; margin: 2px 2px 12px; }
     .url-hint { font-size: .9rem; color: #8a86b8; font-weight: 500; margin: 12px 2px 2px; }
 
@@ -254,7 +254,7 @@ st.markdown(
             <div class="hero-logo"></div>
             <div class="hero-title">AI YouTube Summarizer</div>
         </div>
-        <div class="hero-sub">요약부터 Q&amp;A까지, 영상 이해의 새로운 방식</div>
+        <div class="hero-sub">영상의 핵심을 빠르게 파악하고, 궁금한 것은 바로 물어보세요</div>
     </div>
     """,
     unsafe_allow_html=True,
@@ -273,11 +273,11 @@ with st.container(key="url_card", border=True):
             key="url_input",
         )
     with col_btn:
-        analyze = st.button("✨ 요약하기", type="primary", use_container_width=True)
-    st.markdown(
-        '<div class="url-hint">💡 YouTube 영상의 URL을 입력하면 AI가 핵심 내용을 요약해드려요!</div>',
-        unsafe_allow_html=True,
-    )
+        analyze = st.button("✦ 요약하기", type="primary", use_container_width=True)
+    # st.markdown(
+    #     '<div class="url-hint">💡 YouTube 영상의 URL을 입력하면 AI가 핵심 내용을 요약해드려요!</div>',
+    #     unsafe_allow_html=True,
+    # )
 
 
 # ----------------------------- 분석 실행 -----------------------------
@@ -404,18 +404,19 @@ if st.session_state.summary:
 
 else:
     # 빈 화면 — 예시 영상 칩(가로 한 줄, 클릭 시 입력창 자동 입력) + 3개 기능 소개 카드
-    st.markdown(
-        '<div class="ex-head">▶&nbsp;&nbsp;예시 영상으로 바로 시작해보세요</div>',
-        unsafe_allow_html=True,
-    )
-    with st.container(key="exchips"):
-        for i, ex in enumerate(EXAMPLES, 1):
-            st.button(
-                f'{ex["icon"]}  {ex["label"]}',
-                key=f"ex{i}",
-                on_click=use_example,
-                args=(ex["url"],),
-            )
+    with st.container(key="ex_card", border=True):
+        st.markdown(
+            '<div class="ex-head">▶&nbsp;&nbsp;예시 영상으로 바로 시작해보세요</div>',
+            unsafe_allow_html=True,
+        )
+        with st.container(key="exchips"):
+            for i, ex in enumerate(EXAMPLES, 1):
+                st.button(
+                    f'{ex["icon"]}  {ex["label"]}',
+                    key=f"ex{i}",
+                    on_click=use_example,
+                    args=(ex["url"],),
+                )
 
     st.write("")
     f1, f2, f3 = st.columns(3, gap="medium")
