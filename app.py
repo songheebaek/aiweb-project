@@ -145,8 +145,8 @@ st.markdown(
         padding: 6px 10px;
     }
     .card-head { font-size: 1.12rem; font-weight: 700; color: #1f2438; margin: 4px 2px 12px; }
-    /* 전체 요약 박스: 영상과 같은 16:9 비율 → 화면 폭과 무관하게 영상 높이와 자동 일치 (내용 길면 스크롤) */
-    .st-key-summary_card { aspect-ratio: 16 / 9; overflow-y: auto; }
+    /* 요약·영상 박스를 같은 고정 높이로(아래 N) → 항상 같은 크기. 영상은 박스 안에서 세로 중앙 정렬. */
+    .st-key-video_card div[data-testid="stVerticalBlock"] { height: 100%; justify-content: center; }
 
     /* ----- 기능 카드 (빈 화면) ----- */
     .feat { text-align: left; padding-bottom: 14px; }
@@ -274,10 +274,11 @@ if analyze:
 if st.session_state.summary:
     vid = st.session_state.video_id
 
-    # 1단: 전체 요약 | 영상 — 둘 다 16:9라 화면 폭과 무관하게 높이가 자동으로 같아짐.
+    # 1단: 전체 요약 | 영상 — 둘 다 같은 고정 높이로 박스 크기 통일 (영상은 박스 안 세로 중앙 정렬)
+    CARD_H = 320
     c_sum, c_vid = st.columns([1, 1], gap="medium")
     with c_sum:
-        with st.container(key="summary_card", border=True):
+        with st.container(height=CARD_H, border=True, key="summary_card"):
             # 헤더 행: 제목(좌) + 아이콘 다운로드 버튼(우측 상단)
             h_title, h_btn = st.columns([6, 1], vertical_alignment="center")
             with h_title:
@@ -293,7 +294,7 @@ if st.session_state.summary:
                 )
             st.markdown(st.session_state.summary)
     with c_vid:
-        with st.container(border=True):
+        with st.container(height=CARD_H, border=True, key="video_card"):
             st.video(f"https://www.youtube.com/watch?v={vid}")
 
     # 2단: 타임스탬프 핵심 | Q&A
