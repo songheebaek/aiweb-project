@@ -42,10 +42,10 @@ EXAMPLES = [
 
 # Q&A 빈 상태에서 보여줄 추천 질문 (클릭하면 바로 질문)
 SUGGESTED_QUESTIONS = [
-    "이 영상의 핵심 내용은 무엇인가요?",
-    "가장 중요한 인사이트는 무엇인가요?",
-    "3줄로 요약해주세요",
-    "초보자도 이해할 수 있게 설명해주세요",
+    "이 영상의 핵심 내용은 뭐야?",
+    "가장 중요한 인사이트는 뭐야?",
+    "전체 내용을 3줄로 요약해줘",
+    "초보자도 이해할 수 있게 설명해줘",
 ]
 
 
@@ -181,10 +181,10 @@ st.markdown(
         padding: 6px 10px;
     }
     .card-head { font-size: 1.12rem; font-weight: 700; color: #1f2438; margin: 4px 2px 12px; }
-    /* 타임스탬프 박스: 최대 높이를 Q&A 빈 상태 기본 높이(약 330px)에 맞춤. 초과 시 스크롤 */
-    .st-key-ts_card { max-height: 330px; overflow-y: auto; }
-    /* Q&A 박스: 채팅이 길어지면 380까지 늘었다가 스크롤 */
-    .st-key-qa_card { max-height: 380px; overflow-y: auto; }
+    /* 타임스탬프 박스: 최대 높이를 Q&A 빈 상태 기본 높이(약 350px)에 맞춤. 초과 시 스크롤 */
+    .st-key-ts_card { max-height: 350px; overflow-y: auto; }
+    /* Q&A: 채팅 영역(qa_body)만 스크롤 → 입력창(form)은 카드 하단에 고정 (전체 카드는 350 안에서 구성) */
+    .st-key-qa_body { max-height: 235px; overflow-y: auto; }
     /* 요약·영상 박스 동일 고정 높이. 영상은 박스 안에서 세로·가로 모두 중앙 정렬. */
     .st-key-video_card div[data-testid="stVerticalBlock"] { height: 100%; justify-content: center; align-items: center; }
     .st-key-video_card [data-testid="stVideo"] { margin: 0 auto; }
@@ -417,33 +417,35 @@ if st.session_state.summary:
         with st.container(border=True, key="qa_card"):
             st.markdown('<div class="card-head">💬 영상과 대화하기 (Q&A)</div>', unsafe_allow_html=True)
 
-            if not st.session_state.chat and not st.session_state.pending_q:
-                # 빈 상태: 안내 문구 + 추천 질문 pill (첫 질문 전까지)
-                st.markdown(
-                    '<div class="qa-guide">이 영상을 바탕으로 궁금한 점을 자유롭게 질문해보세요.</div>'
-                    '<div class="qa-sug-head">💡 추천 질문</div>',
-                    unsafe_allow_html=True,
-                )
-                with st.container(key="suggestions"):
-                    for i, sq in enumerate(SUGGESTED_QUESTIONS):
-                        st.button(sq, key=f"sug{i}", on_click=ask_suggestion, args=(sq,))
-            else:
-                # 채팅 상태: 말풍선 (+ 답변 생성 중이면 타이핑 로딩)
-                bubbles = '<div class="bubbles">'
-                for turn in st.session_state.chat:
-                    role = "user" if turn["role"] == "user" else "bot"
-                    bubbles += (
-                        f'<div class="bubble-row {role}"><div class="bubble {role}">'
-                        f'{esc(turn["content"])}</div></div>'
+            # 채팅/추천 영역(스크롤되는 부분) — 고정 컨테이너로 감싸 구조 안정화(폼 중복 방지) + 이 영역만 스크롤
+            with st.container(key="qa_body"):
+                if not st.session_state.chat and not st.session_state.pending_q:
+                    # 빈 상태: 안내 문구 + 추천 질문 pill (첫 질문 전까지)
+                    st.markdown(
+                        '<div class="qa-guide">이 영상을 바탕으로 궁금한 점을 자유롭게 질문해보세요.</div>'
+                        '<div class="qa-sug-head">💡 추천 질문</div>',
+                        unsafe_allow_html=True,
                     )
-                if st.session_state.pending_q:
-                    bubbles += (
-                        '<div class="bubble-row bot"><div class="bubble bot">'
-                        '<span class="typing"><span class="dot"></span>'
-                        '<span class="dot"></span><span class="dot"></span></span></div></div>'
-                    )
-                bubbles += "</div>"
-                st.markdown(bubbles, unsafe_allow_html=True)
+                    with st.container(key="suggestions"):
+                        for i, sq in enumerate(SUGGESTED_QUESTIONS):
+                            st.button(sq, key=f"sug{i}", on_click=ask_suggestion, args=(sq,))
+                else:
+                    # 채팅 상태: 말풍선 (+ 답변 생성 중이면 타이핑 로딩)
+                    bubbles = '<div class="bubbles">'
+                    for turn in st.session_state.chat:
+                        role = "user" if turn["role"] == "user" else "bot"
+                        bubbles += (
+                            f'<div class="bubble-row {role}"><div class="bubble {role}">'
+                            f'{esc(turn["content"])}</div></div>'
+                        )
+                    if st.session_state.pending_q:
+                        bubbles += (
+                            '<div class="bubble-row bot"><div class="bubble bot">'
+                            '<span class="typing"><span class="dot"></span>'
+                            '<span class="dot"></span><span class="dot"></span></span></div></div>'
+                        )
+                    bubbles += "</div>"
+                    st.markdown(bubbles, unsafe_allow_html=True)
 
             with st.form("qa_form", clear_on_submit=True):
                 fcol, bcol = st.columns([5, 1], vertical_alignment="bottom")
