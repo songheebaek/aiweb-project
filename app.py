@@ -190,6 +190,14 @@ st.markdown(
     .bubble { padding: 10px 14px; border-radius: 16px; max-width: 85%; font-size: .95rem; line-height: 1.45; }
     .bubble.user { background: #eef0fb; color: #2b3047; border-bottom-right-radius: 5px; }
     .bubble.bot { background: #f4f5f9; color: #2b3047; border-bottom-left-radius: 5px; }
+    /* 답변 생성 중 타이핑 로딩(점 3개 애니메이션) */
+    .typing { display: inline-flex; gap: 5px; align-items: center; }
+    .typing .dot { width: 7px; height: 7px; border-radius: 50%; background: #aeb4cc;
+                   animation: typing-blink 1.2s infinite both; }
+    .typing .dot:nth-child(2) { animation-delay: .2s; }
+    .typing .dot:nth-child(3) { animation-delay: .4s; }
+    @keyframes typing-blink { 0%,80%,100% { opacity: .25; transform: translateY(0); }
+                              40% { opacity: 1; transform: translateY(-2px); } }
 
     /* ----- 버튼: 보라색 ----- */
     .stButton > button, .stFormSubmitButton > button, .stDownloadButton > button {
@@ -245,6 +253,7 @@ for key, default in [
     ("highlights", None),
     ("chat", []),
     ("video_id", None),
+    ("pending_q", None),
 ]:
     st.session_state.setdefault(key, default)
 
@@ -382,6 +391,13 @@ if st.session_state.summary:
                     f'<div class="bubble-row {role}"><div class="bubble {role}">'
                     f'{esc(turn["content"])}</div></div>'
                 )
+            # 답변 생성 대기 중이면 상대(bot) 말풍선에 타이핑 로딩 표시
+            if st.session_state.pending_q:
+                bubbles += (
+                    '<div class="bubble-row bot"><div class="bubble bot">'
+                    '<span class="typing"><span class="dot"></span>'
+                    '<span class="dot"></span><span class="dot"></span></span></div></div>'
+                )
             bubbles += "</div>"
             st.markdown(bubbles, unsafe_allow_html=True)
 
@@ -394,15 +410,23 @@ if st.session_state.summary:
                 with bcol:
                     sent = st.form_submit_button("➤", use_container_width=True)
 
-            if sent and q:
+            # 1단계: 전송 → 내 질문 말풍선 즉시 표시 + 답변 대기 플래그 (바로 rerun)
+            if sent and q and not st.session_state.pending_q:
                 st.session_state.chat.append({"role": "user", "content": q})
+                st.session_state.pending_q = q
+                st.rerun()
+
+            # 2단계: 대기 중이면(질문 말풍선+로딩이 위에 렌더된 뒤) AI 답변 생성 → 교체
+            if st.session_state.pending_q:
+                pq = st.session_state.pending_q
                 try:
                     ans = model_config.answer_question(
-                        st.session_state.transcript_text, q, st.session_state.chat[:-1]
+                        st.session_state.transcript_text, pq, st.session_state.chat[:-1]
                     )
                 except Exception as e:
                     ans = ai_error_msg(e)
                 st.session_state.chat.append({"role": "assistant", "content": ans})
+                st.session_state.pending_q = None
                 st.rerun()
 
 else:
