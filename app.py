@@ -181,8 +181,9 @@ st.markdown(
         padding: 6px 10px;
     }
     .card-head { font-size: 1.12rem; font-weight: 700; color: #1f2438; margin: 4px 2px 12px; }
-    /* 타임스탬프 박스: 최대 높이를 Q&A 빈 상태 기본 높이(약 350px)에 맞춤. 초과 시 스크롤 */
-    .st-key-ts_card { max-height: 350px; overflow-y: auto; }
+    /* 제목(헤더)은 카드 상단에 고정하고, 본문 영역만 스크롤되게 (제목이 스크롤에 안 사라짐) */
+    .st-key-sum_body { max-height: 226px; overflow-y: auto; }   /* 전체 요약 본문 */
+    .st-key-ts_body { max-height: 274px; overflow-y: auto; }    /* 타임스탬프 본문 */
     /* Q&A: 채팅 영역(qa_body)만 스크롤 → 입력창(form)은 카드 하단에 고정 (전체 카드는 350 안에서 구성) */
     .st-key-qa_body { max-height: 235px; overflow-y: auto; }
     /* 요약·영상 박스 동일 고정 높이. 영상은 박스 안에서 세로·가로 모두 중앙 정렬. */
@@ -389,7 +390,9 @@ if st.session_state.summary:
                     help="요약을 텍스트 파일로 저장",
                     use_container_width=True,
                 )
-            st.markdown(st.session_state.summary)
+            # 본문(스크롤): 헤더는 위에 고정, 요약 내용만 스크롤
+            with st.container(key="sum_body"):
+                st.markdown(st.session_state.summary)
     with c_vid:
         with st.container(height=CARD_H, border=True, key="video_card"):
             st.video(f"https://www.youtube.com/watch?v={vid}")
@@ -400,21 +403,23 @@ if st.session_state.summary:
     with c_ts:
         with st.container(border=True, key="ts_card"):
             st.markdown('<div class="card-head">🕒 타임스탬프별 핵심 내용</div>', unsafe_allow_html=True)
-            hls = st.session_state.highlights or []
-            if hls:
-                rows = ""
-                for h in hls:
-                    label = fmt_time(h["start"])
-                    link = f"https://www.youtube.com/watch?v={vid}&t={h['start']}s"
-                    rows += (
-                        f'<div class="ts-row">'
-                        f'<a class="ts-time" href="{link}" target="_blank">{label}</a>'
-                        f'<span class="ts-text">{esc(h["point"])}</span>'
-                        f'</div>'
-                    )
-                st.markdown(rows, unsafe_allow_html=True)
-            else:
-                st.caption("타임스탬프 핵심을 생성하지 못했어요. 다시 시도해보세요.")
+            # 본문(스크롤): 헤더는 위에 고정, 행 목록만 스크롤
+            with st.container(key="ts_body"):
+                hls = st.session_state.highlights or []
+                if hls:
+                    rows = ""
+                    for h in hls:
+                        label = fmt_time(h["start"])
+                        link = f"https://www.youtube.com/watch?v={vid}&t={h['start']}s"
+                        rows += (
+                            f'<div class="ts-row">'
+                            f'<a class="ts-time" href="{link}" target="_blank">{label}</a>'
+                            f'<span class="ts-text">{esc(h["point"])}</span>'
+                            f'</div>'
+                        )
+                    st.markdown(rows, unsafe_allow_html=True)
+                else:
+                    st.caption("타임스탬프 핵심을 생성하지 못했어요. 다시 시도해보세요.")
 
     with c_qa:
         with st.container(border=True, key="qa_card"):
