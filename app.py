@@ -185,8 +185,9 @@ st.markdown(
     .st-key-ts_card { max-height: 330px; overflow-y: auto; }
     /* Q&A 박스: 채팅이 길어지면 380까지 늘었다가 스크롤 */
     .st-key-qa_card { max-height: 380px; overflow-y: auto; }
-    /* 요약·영상 박스를 같은 고정 높이로(아래 N) → 항상 같은 크기. 영상은 박스 안에서 세로 중앙 정렬. */
+    /* 요약·영상 박스 동일 고정 높이. 영상은 박스 안에서 세로·가로 모두 중앙 정렬. */
     .st-key-video_card div[data-testid="stVerticalBlock"] { height: 100%; justify-content: center; align-items: center; }
+    .st-key-video_card [data-testid="stVideo"] { margin: 0 auto; }
 
     /* ----- 기능 카드 (빈 화면) ----- */
     .feat { text-align: center; padding-bottom: 14px; }
@@ -367,7 +368,7 @@ if analyze:
 if st.session_state.summary:
     vid = st.session_state.video_id
 
-    # 1단: 전체 요약 | 영상 — 둘 다 같은 고정 높이로 박스 크기 통일 (영상은 박스 안 세로 중앙 정렬)
+    # 1단: 전체 요약 | 영상 — 둘 다 같은 고정 높이로 박스 크기 통일 (영상은 박스 안 세로·가로 중앙 정렬)
     CARD_H = 320
     c_sum, c_vid = st.columns([1, 1], gap="medium")
     with c_sum:
@@ -492,7 +493,7 @@ else:
     feats = [
         (f1, "📄", "AI 요약", "핵심 내용을 깔끔하게 요약해 드립니다."),
         (f2, "🕒", "타임스탬프 핵심 정리", "중요한 내용이 언제 나오는지 확인하세요."),
-        (f3, "💬", "영상과 대화하기 (Q&A)", "영상 내용을 기반으로 궁금한 점을 물어보세요."),
+        (f3, "💬", "영상 기반 Q&A", "영상 내용을 기반으로 궁금한 점을 물어보세요."),
     ]
     for col, ico, title, desc in feats:
         with col:
