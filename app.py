@@ -181,8 +181,10 @@ st.markdown(
         padding: 6px 10px;
     }
     .card-head { font-size: 1.12rem; font-weight: 700; color: #1f2438; margin: 4px 2px 12px; }
-    /* 타임스탬프 / Q&A 박스: 동일한 최대 높이, 초과 시 스크롤 */
-    .st-key-ts_card, .st-key-qa_card { max-height: 380px; overflow-y: auto; }
+    /* 타임스탬프 박스: 최대 높이를 Q&A 빈 상태 기본 높이(약 330px)에 맞춤. 초과 시 스크롤 */
+    .st-key-ts_card { max-height: 330px; overflow-y: auto; }
+    /* Q&A 박스: 채팅이 길어지면 380까지 늘었다가 스크롤 */
+    .st-key-qa_card { max-height: 380px; overflow-y: auto; }
     /* 요약·영상 박스를 같은 고정 높이로(아래 N) → 항상 같은 크기. 영상은 박스 안에서 세로 중앙 정렬. */
     .st-key-video_card div[data-testid="stVerticalBlock"] { height: 100%; justify-content: center; align-items: center; }
 
@@ -220,11 +222,11 @@ st.markdown(
     .qa-guide { font-size: .92rem; color: #8a86b8; margin: 2px 2px 16px; line-height: 1.45; }
     .qa-sug-head { font-size: .9rem; font-weight: 700; color: #6b6f86; margin: 2px 2px 10px; }
     .st-key-suggestions { flex-direction: row !important; flex-wrap: wrap !important;
-        gap: 8px !important; width: 100% !important; align-items: flex-start !important; }
-    .st-key-suggestions > [data-testid="stElementContainer"] { width: auto !important; flex: 0 0 auto !important; }
-    .st-key-suggestions .stButton { width: auto !important; }
+        gap: 8px !important; width: 100% !important; align-items: stretch !important; }
+    .st-key-suggestions > [data-testid="stElementContainer"] { flex: 0 0 calc(50% - 4px) !important; width: calc(50% - 4px) !important; }
+    .st-key-suggestions .stButton { width: 100% !important; }
     .st-key-suggestions .stButton > button {
-        width: max-content !important; max-width: 100%;
+        width: 100% !important; height: 100%;
         background: #f6f5fc; color: #5b5876; border: 1px solid #ebe9f6;
         border-radius: 999px; font-weight: 500; font-size: .85rem;
         padding: .34rem .9rem; min-height: 0; box-shadow: none; white-space: normal;
