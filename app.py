@@ -40,6 +40,14 @@ EXAMPLES = [
     {"url": "https://www.youtube.com/watch?v=7OUWELKUac4&t=1202s", "icon": "🦾", "label": "로봇 산업"},
 ]
 
+# Q&A 빈 상태에서 보여줄 추천 질문 (클릭하면 바로 질문)
+SUGGESTED_QUESTIONS = [
+    "이 영상의 핵심 내용은 무엇인가요?",
+    "가장 중요한 인사이트는 무엇인가요?",
+    "3줄로 요약해주세요",
+    "초보자도 이해할 수 있게 설명해주세요",
+]
+
 
 # ----------------------------- 유틸 -----------------------------
 def extract_video_id(url: str) -> str | None:
@@ -123,6 +131,13 @@ def use_example(example_url: str) -> None:
     st.session_state.url_input = example_url
 
 
+def ask_suggestion(question: str) -> None:
+    """추천 질문 클릭 시 바로 질문 전송 (on_click 콜백). 이후 rerun에서 답변 생성."""
+    if not st.session_state.pending_q:
+        st.session_state.chat.append({"role": "user", "content": question})
+        st.session_state.pending_q = question
+
+
 # ----------------------------- 페이지 설정 + 스타일 -----------------------------
 st.set_page_config(
     page_title="AI YouTube Summarizer",
@@ -200,6 +215,21 @@ st.markdown(
     .typing .dot:nth-child(3) { animation-delay: .4s; }
     @keyframes typing-blink { 0%,80%,100% { opacity: .25; transform: translateY(0); }
                               40% { opacity: 1; transform: translateY(-2px); } }
+
+    /* ----- Q&A 빈 상태: 안내 문구 + 추천 질문 pill ----- */
+    .qa-guide { font-size: .92rem; color: #8a86b8; margin: 2px 2px 16px; line-height: 1.45; }
+    .qa-sug-head { font-size: .9rem; font-weight: 700; color: #6b6f86; margin: 2px 2px 10px; }
+    .st-key-suggestions { flex-direction: row !important; flex-wrap: wrap !important;
+        gap: 8px !important; width: 100% !important; align-items: flex-start !important; }
+    .st-key-suggestions > [data-testid="stElementContainer"] { width: auto !important; flex: 0 0 auto !important; }
+    .st-key-suggestions .stButton { width: auto !important; }
+    .st-key-suggestions .stButton > button {
+        width: max-content !important; max-width: 100%;
+        background: #f6f5fc; color: #5b5876; border: 1px solid #ebe9f6;
+        border-radius: 999px; font-weight: 500; font-size: .85rem;
+        padding: .34rem .9rem; min-height: 0; box-shadow: none; white-space: normal;
+    }
+    .st-key-suggestions .stButton > button:hover { background: #efecfb; color: #5a4bd4; border-color: #d8d2f3; }
 
     /* ----- 버튼: 보라색 ----- */
     .stButton > button, .stFormSubmitButton > button, .stDownloadButton > button {
@@ -384,24 +414,33 @@ if st.session_state.summary:
         with st.container(border=True, key="qa_card"):
             st.markdown('<div class="card-head">💬 영상과 대화하기 (Q&A)</div>', unsafe_allow_html=True)
 
-            bubbles = '<div class="bubbles">'
-            if not st.session_state.chat:
-                bubbles += '<div class="bubble-row bot"><div class="bubble bot">영상 내용에 대해 무엇이든 물어보세요. 자막에 근거해 답합니다.</div></div>'
-            for turn in st.session_state.chat:
-                role = "user" if turn["role"] == "user" else "bot"
-                bubbles += (
-                    f'<div class="bubble-row {role}"><div class="bubble {role}">'
-                    f'{esc(turn["content"])}</div></div>'
+            if not st.session_state.chat and not st.session_state.pending_q:
+                # 빈 상태: 안내 문구 + 추천 질문 pill (첫 질문 전까지)
+                st.markdown(
+                    '<div class="qa-guide">이 영상을 바탕으로 궁금한 점을 자유롭게 질문해보세요.</div>'
+                    '<div class="qa-sug-head">💡 추천 질문</div>',
+                    unsafe_allow_html=True,
                 )
-            # 답변 생성 대기 중이면 상대(bot) 말풍선에 타이핑 로딩 표시
-            if st.session_state.pending_q:
-                bubbles += (
-                    '<div class="bubble-row bot"><div class="bubble bot">'
-                    '<span class="typing"><span class="dot"></span>'
-                    '<span class="dot"></span><span class="dot"></span></span></div></div>'
-                )
-            bubbles += "</div>"
-            st.markdown(bubbles, unsafe_allow_html=True)
+                with st.container(key="suggestions"):
+                    for i, sq in enumerate(SUGGESTED_QUESTIONS):
+                        st.button(sq, key=f"sug{i}", on_click=ask_suggestion, args=(sq,))
+            else:
+                # 채팅 상태: 말풍선 (+ 답변 생성 중이면 타이핑 로딩)
+                bubbles = '<div class="bubbles">'
+                for turn in st.session_state.chat:
+                    role = "user" if turn["role"] == "user" else "bot"
+                    bubbles += (
+                        f'<div class="bubble-row {role}"><div class="bubble {role}">'
+                        f'{esc(turn["content"])}</div></div>'
+                    )
+                if st.session_state.pending_q:
+                    bubbles += (
+                        '<div class="bubble-row bot"><div class="bubble bot">'
+                        '<span class="typing"><span class="dot"></span>'
+                        '<span class="dot"></span><span class="dot"></span></span></div></div>'
+                    )
+                bubbles += "</div>"
+                st.markdown(bubbles, unsafe_allow_html=True)
 
             with st.form("qa_form", clear_on_submit=True):
                 fcol, bcol = st.columns([5, 1], vertical_alignment="bottom")
