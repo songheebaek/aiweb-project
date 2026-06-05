@@ -166,6 +166,8 @@ st.markdown(
         padding: 6px 10px;
     }
     .card-head { font-size: 1.12rem; font-weight: 700; color: #1f2438; margin: 4px 2px 12px; }
+    /* 타임스탬프 / Q&A 박스: 동일한 최대 높이, 초과 시 스크롤 */
+    .st-key-ts_card, .st-key-qa_card { max-height: 380px; overflow-y: auto; }
     /* 요약·영상 박스를 같은 고정 높이로(아래 N) → 항상 같은 크기. 영상은 박스 안에서 세로 중앙 정렬. */
     .st-key-video_card div[data-testid="stVerticalBlock"] { height: 100%; justify-content: center; align-items: center; }
 
@@ -360,7 +362,7 @@ if st.session_state.summary:
     c_ts, c_qa = st.columns(2, gap="medium")
 
     with c_ts:
-        with st.container(border=True):
+        with st.container(border=True, key="ts_card"):
             st.markdown('<div class="card-head">🕒 타임스탬프별 핵심 내용</div>', unsafe_allow_html=True)
             hls = st.session_state.highlights or []
             if hls:
@@ -379,7 +381,7 @@ if st.session_state.summary:
                 st.caption("타임스탬프 핵심을 생성하지 못했어요. 다시 시도해보세요.")
 
     with c_qa:
-        with st.container(border=True):
+        with st.container(border=True, key="qa_card"):
             st.markdown('<div class="card-head">💬 영상과 대화하기 (Q&A)</div>', unsafe_allow_html=True)
 
             bubbles = '<div class="bubbles">'
