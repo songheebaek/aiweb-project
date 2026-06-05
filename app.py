@@ -198,9 +198,12 @@ st.markdown(
     /* ----- 타임스탬프 행 ----- */
     .ts-row { display: flex; gap: 14px; padding: 9px 4px; border-bottom: 1px solid #f1f2f8; }
     .ts-row:last-child { border-bottom: none; }
-    .ts-time { color: #18cf15; font-weight: 700; font-variant-numeric: tabular-nums;
-               text-decoration: none; flex-shrink: 0; min-width: 52px; }
-    .ts-time:hover { text-decoration: underline; }
+    /* 링크(<a>)라서 Streamlit 기본 링크색을 덮어쓰도록 !important + 방문/링크 상태 모두 지정 */
+    .ts-time, .ts-time:link, .ts-time:visited, .ts-time:active {
+        color: #18cf15 !important; font-weight: 700; font-variant-numeric: tabular-nums;
+        text-decoration: none; flex-shrink: 0; min-width: 52px;
+    }
+    .ts-time:hover { color: #18cf15 !important; text-decoration: underline; }
     .ts-text { color: #2b3047; font-size: .96rem; line-height: 1.4; }
 
     /* ----- Q&A 말풍선 ----- */
