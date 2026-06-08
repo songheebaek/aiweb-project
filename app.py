@@ -251,7 +251,14 @@ st.markdown(
     .stTextInput input { border-radius: 12px; }
 
     /* ----- 예시 영상 칩 (요약 전 화면) — 가로 한 줄 알약 ----- */
-    .ex-head { font-size: .95rem; font-weight: 700; color: #4b5168; margin: 2px 2px 12px; }
+    .ex-head { font-size: .95rem; font-weight: 700; color: #4b5168; margin: 2px 2px 12px; text-align: center; }
+    /* 홈(빈 화면): 한 화면 채우기 — 예시는 가운데, 기능 카드는 맨 아래(푸터 위) */
+    .st-key-home { display: flex; flex-direction: column; min-height: calc(100vh - 400px); }
+    /* 예시 영역 래퍼를 늘려 화면 중앙 정렬 (기능 카드는 자연히 맨 아래=푸터 위로) */
+    .st-key-home > [data-testid="stLayoutWrapper"]:first-child {
+        flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center;
+    }
+    .st-key-ex_zone { justify-content: center; }   /* 예시(제목+칩)를 영역 내 세로 중앙으로 */
     /* 칩 컨테이너(stVerticalBlock)를 가로 flex로 → 칩들이 한 줄에 배치 */
     .st-key-exchips { flex-direction: row !important; flex-wrap: wrap !important;
         gap: 35px !important; width: 100% !important; align-items: flex-start !important;
@@ -484,37 +491,37 @@ if st.session_state.summary:
                 st.rerun()
 
 else:
-    # 빈 화면 — 예시 영상 칩(가로 한 줄, 클릭 시 입력창 자동 입력) + 3개 기능 소개 카드
-    st.markdown(
-        '<div class="ex-head">▶&nbsp;&nbsp;예시 영상으로 바로 시작해보세요</div>',
-        unsafe_allow_html=True,
-    )
-    with st.container(key="exchips"):
-        for i, ex in enumerate(EXAMPLES, 1):
-            st.button(
-                f'{ex["icon"]}  {ex["label"]}',
-                key=f"ex{i}",
-                on_click=use_example,
-                args=(ex["url"],),
+    # 빈 화면(홈) — 한 화면 채우기: 예시 영상은 화면 중앙, 기능 카드는 푸터 바로 위(맨 아래)
+    with st.container(key="home"):
+        with st.container(key="ex_zone"):
+            st.markdown(
+                '<div class="ex-head">예시 영상으로 바로 시작해보세요</div>',
+                unsafe_allow_html=True,
             )
+            with st.container(key="exchips"):
+                for i, ex in enumerate(EXAMPLES, 1):
+                    st.button(
+                        f'{ex["icon"]}  {ex["label"]}',
+                        key=f"ex{i}",
+                        on_click=use_example,
+                        args=(ex["url"],),
+                    )
 
-    # 기능 카드 위쪽 여백 (아래로 내림)
-    st.markdown('<div style="height: 134px"></div>', unsafe_allow_html=True)
-    f1, f2, f3 = st.columns(3, gap="medium")
-    feats = [
-        (f1, "📄", "AI 요약", "핵심 내용을 깔끔하게 요약해 드립니다."),
-        (f2, "🕒", "타임스탬프 핵심 정리", "중요한 내용이 언제 나오는지 확인하세요."),
-        (f3, "💬", "영상 기반 Q&A", "영상 내용을 기반으로 궁금한 점을 물어보세요."),
-    ]
-    for col, ico, title, desc in feats:
-        with col:
-            with st.container(border=True):
-                st.markdown(
-                    f'<div class="feat"><div class="feat-ico">{ico}</div>'
-                    f'<div class="feat-title">{title}</div>'
-                    f'<div class="feat-desc">{desc}</div></div>',
-                    unsafe_allow_html=True,
-                )
+        f1, f2, f3 = st.columns(3, gap="medium")
+        feats = [
+            (f1, "📄", "AI 요약", "핵심 내용을 깔끔하게 요약해 드립니다."),
+            (f2, "🕒", "타임스탬프 핵심 정리", "중요한 내용이 언제 나오는지 확인하세요."),
+            (f3, "💬", "영상 기반 Q&A", "영상 내용을 기반으로 궁금한 점을 물어보세요."),
+        ]
+        for col, ico, title, desc in feats:
+            with col:
+                with st.container(border=True):
+                    st.markdown(
+                        f'<div class="feat"><div class="feat-ico">{ico}</div>'
+                        f'<div class="feat-title">{title}</div>'
+                        f'<div class="feat-desc">{desc}</div></div>',
+                        unsafe_allow_html=True,
+                    )
 
 
 # ----------------------------- 하단 기능 칩 -----------------------------
