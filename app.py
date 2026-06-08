@@ -150,7 +150,8 @@ st.markdown(
     """
     <style>
     /* ----- 전체 배경 / 여백 ----- */
-    .stApp { background: linear-gradient(180deg, #f7f8fc 0%, #eef0f8 100%); }
+    /* 기본 100% 화면에서도 살짝 축소된(≈90%) 비율로 보이게 — 콘텐츠가 한 화면에 여유롭게 들어감 */
+    .stApp { background: linear-gradient(180deg, #f7f8fc 0%, #eef0f8 100%); zoom: 0.9; }
     /* Streamlit 기본 헤더/메뉴(다크·라이트 토글 등)는 유지. 제목과 안 겹치게 상단 여백만 확보. */
     .block-container { padding-top: 4.5rem; padding-bottom: 72px; max-width: 1180px; }
 
