@@ -1,14 +1,10 @@
 ---
-title: {{title}}
-emoji: {{emoji}}
-colorFrom: {{colorFrom}}
-colorTo: {{colorTo}}
-sdk: {{sdk}}
-sdk_version: "{{sdkVersion}}"
-{{#pythonVersion}}
-python_version: "{{pythonVersion}}"
-{{/pythonVersion}}
-app_file: app.py
+title: AI YouTube Summarizer
+emoji: ▶️
+colorFrom: red
+colorTo: yellow
+sdk: docker
+app_port: 7860
 pinned: false
 ---
 

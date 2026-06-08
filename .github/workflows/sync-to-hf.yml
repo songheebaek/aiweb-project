@@ -45,18 +45,18 @@ jobs:
       - name: 3. HuggingFace Space로 push
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          HF_USER: <id>           # ← 본인 HF username으로 교체
-          HF_SPACE: <repo>        # ← 본인 HF Space 이름으로 교체 (예: calorie-counter)
+          HF_USER: shbaek03       # ← 본인 HF username으로 교체
+          HF_SPACE: aiweb-project # ← 본인 HF Space 이름으로 교체 (예: calorie-counter)
         run: |
           set -e
-          if [ -z "$HF_TOKEN" ]; then
+          if [ -z "${{ secrets.HF_TOKEN }}" ]; then
             echo "❌ HF_TOKEN Secret이 비어 있다. 리포 Settings → Secrets에서 등록할 것."
             exit 1
           fi
-          echo "▶ HF Space로 push: https://huggingface.co/spaces/${HF_USER}/${HF_SPACE}"
-          git push https://${HF_USER}:${HF_TOKEN}@huggingface.co/spaces/${HF_USER}/${HF_SPACE} main --force
+          echo "▶ HF Space로 push: https://huggingface.co/spaces/shbaek03/aiweb-project"
+          git push https://shbaek03:${{ secrets.HF_TOKEN }}@huggingface.co/spaces/shbaek03/aiweb-project main --force
           echo "✅ Push 완료. HF Space 빌드 로그는 다음에서 확인:"
-          echo "   https://huggingface.co/spaces/${HF_USER}/${HF_SPACE}/logs/build"
+          echo "   https://huggingface.co/spaces/shbaek03/aiweb-project/logs/build"
 
       - name: 4. 실패 시 안내
         if: failure()
@@ -65,4 +65,4 @@ jobs:
           echo "  1. HF_TOKEN Secret 값이 정확한가 (hf_... 형태)"
           echo "  2. 토큰 type이 Write인가 (Read는 push 불가)"
           echo "  3. env의 HF_USER, HF_SPACE를 본인 값으로 교체했는가"
-          echo "  4. HF Space가 실제로 생성돼 있는가 (huggingface.co/spaces/<id>/<repo>)"
+          echo "  4. HF Space가 실제로 생성돼 있는가 (huggingface.co/spaces/shbaek03/aiweb-project)"
