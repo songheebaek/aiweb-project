@@ -369,7 +369,12 @@ if analyze:
         except VideoUnavailable:
             st.error("영상을 찾을 수 없습니다. 비공개이거나 삭제된 영상일 수 있어요."); st.stop()
         except (IpBlocked, RequestBlocked):
-            st.error("유튜브가 이 서버의 IP를 차단했습니다. 클라우드 배포 환경이라면 `.env`에 PROXY_URL을 설정하세요."); st.stop()
+            st.error(
+                "유튜브가 이 서버/프록시 IP를 차단했습니다. "
+                "프록시를 이미 설정했다면 그 IP도 막힌 거예요(무료 데이터센터 프록시는 자주 차단됨) — "
+                "다른 IP 또는 주거용(residential) 프록시가 필요합니다. "
+                "(배포 환경에선 HF Secret의 PROXY_URL 또는 WEBSHARE_PROXY_USERNAME/PASSWORD 사용)"
+            ); st.stop()
         except CouldNotRetrieveTranscript:
             st.error("자막을 가져오지 못했습니다. 클라우드 서버라면 IP 차단일 수 있어요 (PROXY_URL 설정 필요)."); st.stop()
         except Exception as e:
