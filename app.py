@@ -260,6 +260,8 @@ st.markdown(
         flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center;
     }
     .st-key-ex_zone { justify-content: center; }   /* 예시(제목+칩)를 영역 내 세로 중앙으로 */
+    /* 예시 칩 ↔ 기능 카드 사이 간격 */
+    .st-key-home > [data-testid="stLayoutWrapper"]:last-child { margin-top: 48px; }
     /* 칩 컨테이너(stVerticalBlock)를 가로 flex로 → 칩들이 한 줄에 배치 */
     .st-key-exchips { flex-direction: row !important; flex-wrap: wrap !important;
         gap: 35px !important; width: 100% !important; align-items: flex-start !important;
