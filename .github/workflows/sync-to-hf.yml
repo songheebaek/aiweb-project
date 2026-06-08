@@ -1,0 +1,68 @@
+# 11주차 CI/CD 템플릿: GitHub push → HuggingFace Space 자동 sync
+# 학생 본인 리포에 그대로 복사. Secret 1개(HF_TOKEN) 등록 후 작동.
+#
+# 작동 흐름:
+#   학생이 main 브랜치에 push
+#   → ubuntu-latest 러너 부팅
+#   → HF Space의 Git remote로 force push
+#   → HF Space가 Dockerfile 받아 자동 빌드
+#   → huggingface.co/spaces/<id>/<repo> 즉시 반영
+#
+# 사전 1회 학생 작업:
+#   1. https://huggingface.co/join 가입 + Access Token (type: Write) 발급
+#   2. https://huggingface.co/new-space → SDK: Docker → Public → Create
+#   3. GitHub 리포 → Settings → Secrets and variables → Actions
+#      Name: HF_TOKEN, Value: hf_... (1에서 발급한 토큰)
+#   4. 아래 <id>, <repo>를 본인 HF username / Space name으로 교체
+#   5. main에 push → Actions 탭에서 녹색 확인
+
+name: Sync to HuggingFace Space
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: 1. 리포 체크아웃 (전체 history + LFS)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: 2. 커밋 정보 표시
+        run: |
+          echo "🚀 동기화 커밋: ${{ github.sha }}"
+          echo "👤 트리거 사용자: ${{ github.actor }}"
+          echo "📝 메시지: ${{ github.event.head_commit.message }}"
+
+      - name: 3. HuggingFace Space로 push
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_USER: <id>           # ← 본인 HF username으로 교체
+          HF_SPACE: <repo>        # ← 본인 HF Space 이름으로 교체 (예: calorie-counter)
+        run: |
+          set -e
+          if [ -z "$HF_TOKEN" ]; then
+            echo "❌ HF_TOKEN Secret이 비어 있다. 리포 Settings → Secrets에서 등록할 것."
+            exit 1
+          fi
+          echo "▶ HF Space로 push: https://huggingface.co/spaces/${HF_USER}/${HF_SPACE}"
+          git push https://${HF_USER}:${HF_TOKEN}@huggingface.co/spaces/${HF_USER}/${HF_SPACE} main --force
+          echo "✅ Push 완료. HF Space 빌드 로그는 다음에서 확인:"
+          echo "   https://huggingface.co/spaces/${HF_USER}/${HF_SPACE}/logs/build"
+
+      - name: 4. 실패 시 안내
+        if: failure()
+        run: |
+          echo "❌ 동기화 실패. 확인 사항:"
+          echo "  1. HF_TOKEN Secret 값이 정확한가 (hf_... 형태)"
+          echo "  2. 토큰 type이 Write인가 (Read는 push 불가)"
+          echo "  3. env의 HF_USER, HF_SPACE를 본인 값으로 교체했는가"
+          echo "  4. HF Space가 실제로 생성돼 있는가 (huggingface.co/spaces/<id>/<repo>)"
