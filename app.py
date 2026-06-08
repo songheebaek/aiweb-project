@@ -254,7 +254,7 @@ st.markdown(
     /* ----- 예시 영상 칩 (요약 전 화면) — 가로 한 줄 알약 ----- */
     .ex-head { font-size: .95rem; font-weight: 700; color: #4b5168; margin: 2px 2px 24px; text-align: center; }
     /* 홈(빈 화면): 한 화면 채우기 — 예시는 가운데, 기능 카드는 맨 아래(푸터 위) */
-    .st-key-home { display: flex; flex-direction: column; min-height: calc(100vh - 550px); }
+    .st-key-home { display: flex; flex-direction: column; min-height: calc(100vh - 580px); margin-top: 30px; }
     /* 예시 영역 래퍼를 늘려 화면 중앙 정렬 (기능 카드는 자연히 맨 아래=푸터 위로) */
     .st-key-home > [data-testid="stLayoutWrapper"]:first-child {
         flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center;
