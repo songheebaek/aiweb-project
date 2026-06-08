@@ -78,22 +78,39 @@ def fmt_time(seconds: float) -> str:
 def fetch_transcript(video_id: str) -> list:
     """자막 세그먼트 [{text, start, duration}] 리스트 반환.
 
-    youtube-transcript-api 1.x 인스턴스 API 사용. 클라우드 IP 차단(SSL EOF 등) 대비 프록시 지원:
-    1순위 Webshare(주거용, 무료 티어) → 2순위 일반 PROXY_URL → 없으면 직접 연결.
+    프록시 우선순위:
+    1) Webshare residential (WEBSHARE_PROXY_USERNAME/PASSWORD)
+    2) PROXY_URL — 콤마(,)로 여러 개 넣으면 막힌 건 건너뛰고 차례로 시도(첫 성공 반환)
+    3) 없으면 직접 연결
+    영상 자체 문제(자막 없음 등)는 즉시 올리고, 프록시/연결 실패만 다음 프록시로 넘어감.
     """
     ws_user = os.getenv("WEBSHARE_PROXY_USERNAME")
     ws_pass = os.getenv("WEBSHARE_PROXY_PASSWORD")
-    proxy_url = os.getenv("PROXY_URL")
+    proxy_urls = [u.strip() for u in os.getenv("PROXY_URL", "").split(",") if u.strip()]
 
+    def _fetch(proxy_config):
+        api = YouTubeTranscriptApi(proxy_config=proxy_config)
+        return api.fetch(video_id, languages=TRANSCRIPT_LANGS).to_raw_data()
+
+    # 1) Webshare residential
     if ws_user and ws_pass:
-        proxy_config = WebshareProxyConfig(proxy_username=ws_user, proxy_password=ws_pass)
-    elif proxy_url:
-        proxy_config = GenericProxyConfig(http_url=proxy_url, https_url=proxy_url)
-    else:
-        proxy_config = None
+        return _fetch(WebshareProxyConfig(proxy_username=ws_user, proxy_password=ws_pass))
 
-    api = YouTubeTranscriptApi(proxy_config=proxy_config)
-    return api.fetch(video_id, languages=TRANSCRIPT_LANGS).to_raw_data()
+    # 2) PROXY_URL 리스트 순회 (막힌 프록시는 건너뛰고 다음 것 시도)
+    if proxy_urls:
+        last_err = None
+        for purl in proxy_urls:
+            try:
+                return _fetch(GenericProxyConfig(http_url=purl, https_url=purl))
+            except (TranscriptsDisabled, NoTranscriptFound, VideoUnavailable):
+                raise  # 영상 자체 문제 → 다른 프록시 시도 무의미
+            except Exception as e:
+                last_err = e
+                continue
+        raise last_err if last_err else RuntimeError("모든 프록시 실패")
+
+    # 3) 프록시 없이 직접 연결
+    return _fetch(None)
 
 
 def build_timestamped_text(segments: list) -> str:
