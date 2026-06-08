@@ -21,7 +21,7 @@ from youtube_transcript_api import (
     RequestBlocked,
     CouldNotRetrieveTranscript,
 )
-from youtube_transcript_api.proxies import GenericProxyConfig
+from youtube_transcript_api.proxies import GenericProxyConfig, WebshareProxyConfig
 
 import model_config
 
@@ -78,12 +78,20 @@ def fmt_time(seconds: float) -> str:
 def fetch_transcript(video_id: str) -> list:
     """자막 세그먼트 [{text, start, duration}] 리스트 반환.
 
-    youtube-transcript-api 1.x 인스턴스 API 사용. 클라우드 IP 차단 대비 PROXY_URL 지원.
+    youtube-transcript-api 1.x 인스턴스 API 사용. 클라우드 IP 차단(SSL EOF 등) 대비 프록시 지원:
+    1순위 Webshare(주거용, 무료 티어) → 2순위 일반 PROXY_URL → 없으면 직접 연결.
     """
+    ws_user = os.getenv("WEBSHARE_PROXY_USERNAME")
+    ws_pass = os.getenv("WEBSHARE_PROXY_PASSWORD")
     proxy_url = os.getenv("PROXY_URL")
-    proxy_config = (
-        GenericProxyConfig(http_url=proxy_url, https_url=proxy_url) if proxy_url else None
-    )
+
+    if ws_user and ws_pass:
+        proxy_config = WebshareProxyConfig(proxy_username=ws_user, proxy_password=ws_pass)
+    elif proxy_url:
+        proxy_config = GenericProxyConfig(http_url=proxy_url, https_url=proxy_url)
+    else:
+        proxy_config = None
+
     api = YouTubeTranscriptApi(proxy_config=proxy_config)
     return api.fetch(video_id, languages=TRANSCRIPT_LANGS).to_raw_data()
 
@@ -365,6 +373,9 @@ if analyze:
         except CouldNotRetrieveTranscript:
             st.error("자막을 가져오지 못했습니다. 클라우드 서버라면 IP 차단일 수 있어요 (PROXY_URL 설정 필요)."); st.stop()
         except Exception as e:
+            m = str(e)
+            if any(k in m for k in ("SSL", "Max retries", "ConnectionError", "Connection", "timed out", "RemoteDisconnected", "EOF")):
+                st.error("자막 서버 연결이 차단됐어요. 배포 서버(클라우드) IP를 YouTube가 막는 경우예요 — 프록시(Webshare/PROXY_URL) 설정이 필요합니다. (로컬에선 정상 동작)"); st.stop()
             st.error(f"자막 추출 중 오류가 발생했습니다: {e}"); st.stop()
 
     st.session_state.segments = segments
