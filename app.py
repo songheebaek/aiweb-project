@@ -498,7 +498,8 @@ else:
                 args=(ex["url"],),
             )
 
-    st.write("")
+    # 기능 카드 위쪽 여백 (조금 아래로 내림)
+    st.markdown('<div style="height: 34px"></div>', unsafe_allow_html=True)
     f1, f2, f3 = st.columns(3, gap="medium")
     feats = [
         (f1, "📄", "AI 요약", "핵심 내용을 깔끔하게 요약해 드립니다."),
