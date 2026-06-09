@@ -209,9 +209,14 @@ st.markdown(
     .card-head { font-size: 1.12rem; font-weight: 700; color: #1f2438; margin: 4px 2px 12px; }
     /* 제목(헤더)은 카드 상단에 고정하고, 본문 영역만 스크롤되게 (제목이 스크롤에 안 사라짐) */
     .st-key-sum_body { max-height: 226px; overflow-y: auto; }   /* 전체 요약 본문 */
-    .st-key-ts_body { max-height: 274px; overflow-y: auto; }    /* 타임스탬프 본문 */
-    /* Q&A: 채팅 영역(qa_body)만 스크롤 → 입력창(form)은 카드 하단에 고정 (전체 카드는 350 안에서 구성) */
-    .st-key-qa_body { max-height: 235px; overflow-y: auto; }
+    /* 타임스탬프·Q&A 카드: 내용량과 무관하게 '항상 같은 고정 높이'.
+       Streamlit height= 대신 CSS로 카드 높이를 고정(height= 는 내부 행을 늘려 렌더가 깨짐).
+       헤더는 카드 상단에 고정, 본문(ts_body·qa_body)만 max-height로 스크롤, Q&A 입력창은 본문 아래 고정. */
+    .st-key-ts_card, .st-key-qa_card { min-height: 360px; max-height: 360px; overflow: hidden; }
+    .st-key-ts_body { max-height: 300px; overflow-y: auto; }    /* 타임스탬프 본문 */
+    /* Q&A: 채팅 영역이 남는 공간을 채워(flex) 입력창(form)을 카드 맨 아래에 고정, 채팅만 스크롤 */
+    .st-key-qa_card > [data-testid="stLayoutWrapper"]:has(.st-key-qa_body) { flex: 1 1 auto; min-height: 0; }
+    .st-key-qa_body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
     /* 요약·영상 박스 동일 고정 높이. 영상은 박스 안에서 세로·가로 모두 중앙 정렬. */
     .st-key-video_card div[data-testid="stVerticalBlock"] { height: 100%; justify-content: center; align-items: center; }
     .st-key-video_card [data-testid="stVideo"] { margin: 0 auto; }
@@ -440,7 +445,7 @@ if st.session_state.summary:
         with st.container(height=CARD_H, border=True, key="video_card"):
             st.video(f"https://www.youtube.com/watch?v={vid}")
 
-    # 2단: 타임스탬프 핵심 | Q&A
+    # 2단: 타임스탬프 핵심 | Q&A — 카드 높이는 CSS(.st-key-ts_card/.st-key-qa_card)로 동일 고정
     c_ts, c_qa = st.columns(2, gap="medium")
 
     with c_ts:
