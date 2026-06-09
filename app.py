@@ -222,6 +222,10 @@ st.markdown(
     /* Q&A: 채팅 영역이 남는 공간을 채워(flex) 입력창(form)을 카드 맨 아래에 고정, 채팅만 스크롤 */
     .st-key-qa_card > [data-testid="stLayoutWrapper"]:has(.st-key-qa_body) { flex: 1 1 auto; min-height: 0; }
     .st-key-qa_body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+    /* Q&A 빈 상태(추천 질문 있을 때)만: 안내+추천질문 블록을 세로 중앙으로 내려 입력창과 여백을 균형 */
+    .st-key-qa_body:has(.st-key-suggestions) { justify-content: center; }
+    /* 채팅영역↔입력창 사이 기본 간격을 줄여, 추천질문 블록의 위/아래 여백이 같아 보이게 */
+    .st-key-qa_card > [data-testid="stLayoutWrapper"]:has([data-testid="stForm"]) { margin-top: -12px; }
     /* 요약·영상 박스 동일 고정 높이. 영상은 박스 안에서 세로·가로 모두 중앙 정렬. */
     .st-key-video_card div[data-testid="stVerticalBlock"] { height: 100%; justify-content: center; align-items: center; }
     .st-key-video_card [data-testid="stVideo"] { margin: 0 auto; }
