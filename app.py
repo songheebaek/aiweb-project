@@ -222,10 +222,9 @@ st.markdown(
     /* Q&A: 채팅 영역이 남는 공간을 채워(flex) 입력창(form)을 카드 맨 아래에 고정, 채팅만 스크롤 */
     .st-key-qa_card > [data-testid="stLayoutWrapper"]:has(.st-key-qa_body) { flex: 1 1 auto; min-height: 0; }
     .st-key-qa_body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
-    /* Q&A 빈 상태(추천 질문 있을 때)만: 안내+추천질문 블록을 세로 중앙으로 내려 입력창과 여백을 균형 */
-    .st-key-qa_body:has(.st-key-suggestions) { justify-content: center; }
-    /* 채팅영역↔입력창 사이 기본 간격을 줄여, 추천질문 블록의 위/아래 여백이 같아 보이게 */
-    .st-key-qa_card > [data-testid="stLayoutWrapper"]:has([data-testid="stForm"]) { margin-top: -12px; }
+    /* Q&A 빈 상태: 안내 문구는 제목 바로 아래(상단) 고정, 추천질문(제목+칩)만 남은 공간 세로 중앙으로
+       → 추천질문 블록의 위/아래 여백이 같아지고 입력창과의 간격도 적당히 줄어듦 */
+    .st-key-qa_body > [data-testid="stLayoutWrapper"]:has(.st-key-sug_zone) { margin-top: auto; margin-bottom: auto; }
     /* 요약·영상 박스 동일 고정 높이. 영상은 박스 안에서 세로·가로 모두 중앙 정렬. */
     .st-key-video_card div[data-testid="stVerticalBlock"] { height: 100%; justify-content: center; align-items: center; }
     .st-key-video_card [data-testid="stVideo"] { margin: 0 auto; }
@@ -489,15 +488,17 @@ if st.session_state.summary:
             # 채팅/추천 영역(스크롤되는 부분) — 고정 컨테이너로 감싸 구조 안정화(폼 중복 방지) + 이 영역만 스크롤
             with st.container(key="qa_body"):
                 if not st.session_state.chat and not st.session_state.pending_q:
-                    # 빈 상태: 안내 문구 + 추천 질문 pill (첫 질문 전까지)
+                    # 빈 상태: 안내 문구(제목 바로 아래 상단 고정) + 추천 질문(아래쪽 중앙)
                     st.markdown(
-                        '<div class="qa-guide">이 영상을 바탕으로 궁금한 점을 자유롭게 질문해보세요.</div>'
-                        '<div class="qa-sug-head">💡 추천 질문</div>',
+                        '<div class="qa-guide">이 영상을 바탕으로 궁금한 점을 자유롭게 질문해보세요.</div>',
                         unsafe_allow_html=True,
                     )
-                    with st.container(key="suggestions"):
-                        for i, sq in enumerate(SUGGESTED_QUESTIONS):
-                            st.button(sq, key=f"sug{i}", on_click=ask_suggestion, args=(sq,))
+                    # 추천 질문(제목+칩)만 남은 공간에서 세로 중앙으로 → 입력창과 여백 균형
+                    with st.container(key="sug_zone"):
+                        st.markdown('<div class="qa-sug-head">💡 추천 질문</div>', unsafe_allow_html=True)
+                        with st.container(key="suggestions"):
+                            for i, sq in enumerate(SUGGESTED_QUESTIONS):
+                                st.button(sq, key=f"sug{i}", on_click=ask_suggestion, args=(sq,))
                 else:
                     # 채팅 상태: 말풍선 (+ 답변 생성 중이면 타이핑 로딩)
                     bubbles = '<div class="bubbles">'
