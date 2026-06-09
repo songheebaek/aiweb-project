@@ -185,8 +185,8 @@ st.markdown(
     /* Streamlit 기본 상단바(헤더/Deploy·메뉴·실행상태)는 숨김 */
     [data-testid="stHeader"] { display: none; }
     [data-testid="stToolbar"] { display: none; }
-    /* 헤더를 숨겼으니 상단 여백을 줄임(제목이 너무 위로 붙지 않게 약간만 확보) */
-    .block-container { padding-top: 2rem; padding-bottom: 72px; max-width: 1180px; }
+    /* 헤더 숨김 후, 전체 콘텐츠를 상단에서 살짝(+20px) 더 내려 배치 */
+    .block-container { padding-top: calc(2rem + 20px); padding-bottom: 72px; max-width: 1180px; }
 
     /* ----- 헤더 (가운데 정렬, 로고는 제목+부제목 세로 중앙) ----- */
     .hero { display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 24px; }
