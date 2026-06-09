@@ -182,8 +182,11 @@ st.markdown(
     /* ----- 전체 배경 / 여백 ----- */
     /* 기본 100% 화면에서도 살짝 축소된(≈90%) 비율로 보이게 — 콘텐츠가 한 화면에 여유롭게 들어감 */
     .stApp { background: linear-gradient(180deg, #f7f8fc 0%, #eef0f8 100%); zoom: 0.9; }
-    /* Streamlit 기본 헤더/메뉴(다크·라이트 토글 등)는 유지. 제목과 안 겹치게 상단 여백만 확보. */
-    .block-container { padding-top: 4.5rem; padding-bottom: 72px; max-width: 1180px; }
+    /* Streamlit 기본 상단바(헤더/Deploy·메뉴·실행상태)는 숨김 */
+    [data-testid="stHeader"] { display: none; }
+    [data-testid="stToolbar"] { display: none; }
+    /* 헤더를 숨겼으니 상단 여백을 줄임(제목이 너무 위로 붙지 않게 약간만 확보) */
+    .block-container { padding-top: 2rem; padding-bottom: 72px; max-width: 1180px; }
 
     /* ----- 헤더 (가운데 정렬, 로고는 제목+부제목 세로 중앙) ----- */
     .hero { display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 24px; }
