@@ -144,9 +144,14 @@ def build_report(video_id: str, summary: str, highlights: list) -> str:
 
 
 def ai_error_msg(e: Exception) -> str:
-    """AI 호출 오류를 사용자 친화적 한국어 메시지로."""
+    """AI 호출 오류를 사용자 친화적 한국어 메시지로. 429(한도 초과)와 503(서버 혼잡)을 구분."""
     s = str(e)
-    if any(k in s for k in ("503", "UNAVAILABLE", "high demand", "429", "overloaded")):
+    if any(k in s for k in ("429", "RESOURCE_EXHAUSTED", "quota", "rate limit", "Rate limit")):
+        return (
+            "오늘 무료 사용 한도(분당/일일 요청 수)를 초과했어요. "
+            "1~2분 후(분당 한도) 또는 내일(일일 한도) 다시 시도해주세요. 🙏"
+        )
+    if any(k in s for k in ("503", "UNAVAILABLE", "high demand", "overloaded", "500")):
         return "지금 Gemini 서버가 일시적으로 혼잡해요(과부하). 잠시 후 다시 시도해주세요. 🙏"
     return f"AI 처리 중 오류가 발생했습니다: {e}"
 
@@ -410,10 +415,14 @@ if analyze:
 
     with st.spinner("영상 요약하는 중... (조금 걸릴 수 있어요)"):
         try:
-            st.session_state.summary = model_config.summarize_video(st.session_state.transcript_text)
-            st.session_state.highlights = model_config.extract_highlights(st.session_state.transcript_text)
+            # 요약 + 타임스탬프를 한 번의 호출로 함께 생성 (무료 한도 절약: 2회→1회)
+            result = model_config.summarize_and_highlight(st.session_state.transcript_text)
+            st.session_state.summary = result["summary"]
+            st.session_state.highlights = result["highlights"]
         except Exception as e:
             st.error(ai_error_msg(e)); st.stop()
+    if not st.session_state.summary:
+        st.error("요약을 생성하지 못했어요. 잠시 후 다시 시도해주세요."); st.stop()
 
 
 # ----------------------------- 본문 -----------------------------
