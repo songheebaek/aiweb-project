@@ -1,7 +1,7 @@
 ---
 title: AI YouTube Summarizer
 emoji: ▶️
-colorFrom: yellow
+colorFrom: blue
 colorTo: indigo
 sdk: docker
 app_port: 8501
