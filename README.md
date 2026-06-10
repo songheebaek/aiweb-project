@@ -2,7 +2,7 @@
 title: AI YouTube Summarizer
 emoji: ▶️
 colorFrom: purple
-colorTo: green
+colorTo: indigo
 sdk: docker
 app_port: 8501
 pinned: false
