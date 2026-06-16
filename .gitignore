@@ -18,3 +18,8 @@ env/
 Thumbs.db
 .idea/
 .vscode/
+.claude/
+
+# 로컬 실행 로그 (저장소에 불필요)
+demo.log
+*.log
