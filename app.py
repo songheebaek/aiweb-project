@@ -310,6 +310,20 @@ def fetch_transcript_with_ytdlp(video_id: str, proxy_config, proxy_mode: str) ->
     except Exception as e:
         raise RuntimeError("yt-dlp fallback을 사용할 수 없습니다. requirements.txt에 yt-dlp가 필요합니다.") from e
 
+    impersonate_target = None
+    impersonate_name = os.getenv("YTDLP_IMPERSONATE", "chrome-120:macos-14").strip()
+    if impersonate_name:
+        try:
+            from yt_dlp.networking.impersonate import ImpersonateTarget
+
+            impersonate_target = ImpersonateTarget.from_str(impersonate_name)
+        except Exception as e:
+            print(
+                f"[DIAG] yt-dlp fallback: impersonate 설정 비활성화 "
+                f"(target={impersonate_name!r}, error={type(e).__name__}: {_scrub(e)})",
+                flush=True,
+            )
+
     proxy_url = getattr(proxy_config, "url", None) if proxy_config else None
     opts = {
         "skip_download": True,
@@ -324,8 +338,14 @@ def fetch_transcript_with_ytdlp(video_id: str, proxy_config, proxy_mode: str) ->
     }
     if proxy_url:
         opts["proxy"] = proxy_url
+    if impersonate_target:
+        opts["impersonate"] = impersonate_target
 
-    print(f"[DIAG] yt-dlp fallback: 시작 (mode={proxy_mode}, video_id={video_id})", flush=True)
+    print(
+        f"[DIAG] yt-dlp fallback: 시작 "
+        f"(mode={proxy_mode}, video_id={video_id}, impersonate={impersonate_target or 'off'})",
+        flush=True,
+    )
     with YoutubeDL(opts) as ydl:
         info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
         picked = _pick_yt_dlp_caption_track(info or {})
@@ -354,8 +374,8 @@ def fetch_transcript_with_ytdlp(video_id: str, proxy_config, proxy_mode: str) ->
 
 @st.cache_resource(show_spinner=False)
 def _proxy_selftest():
-    """[DIAG] 프록시 경유로 (1)출구IP (2)유튜브 접속을 점검해 로그로 남김.
-    자막 추출 동작에는 영향 없음 — 단순 관찰용."""
+    """[DIAG] 프록시 출구 IP만 점검해 로그로 남김.
+    YouTube probe는 실제 자막 fetch 경로와 달라 혼란만 주므로 실행하지 않는다."""
     proxy_config = _webshare_proxy_config()
     if not proxy_config:
         print("[DIAG] selftest: webshare 자격증명 없음", flush=True)
@@ -365,7 +385,6 @@ def _proxy_selftest():
     sess.proxies = proxy_config.to_requests_dict()
     for name, url in [
         ("ipify(출구IP)", "https://api.ipify.org"),
-        ("youtube", "https://www.youtube.com/robots.txt"),
     ]:
         try:
             r = sess.get(url, timeout=20)
@@ -480,11 +499,19 @@ def fetch_transcript(video_id: str) -> list:
                     return fetch_transcript_with_ytdlp(video_id, proxy_config, mode_name)
                 except Exception as e:
                     last_error = e
+                    retryable = _is_retryable_transcript_error(e)
                     print(
                         f"[DIAG] {mode_name} yt-dlp fallback 실패: "
-                        f"{type(e).__name__} - {_scrub(e)}",
+                        f"retryable={retryable}, error={type(e).__name__} - {_scrub(e)}",
                         flush=True,
                     )
+                    if retryable and mode_name != attempts[-1][0]:
+                        print(
+                            "[DIAG] yt-dlp가 네트워크/TLS 오류로 실패해 "
+                            "같은 포트의 youtube-transcript-api 재시도는 건너뛰고 다음 조합으로 폴백합니다.",
+                            flush=True,
+                        )
+                        continue
                     if engine == "yt_dlp" and mode_name != attempts[-1][0]:
                         print("[DIAG] 다음 Webshare 포트/국가 조합으로 폴백합니다.", flush=True)
                         continue

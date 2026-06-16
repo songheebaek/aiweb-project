@@ -6,4 +6,5 @@ google-genai>=1.0                 # Gemini API SDK (구 google-generativeai는 E
 openai>=2.0                       # OpenAI Responses API / GPT provider
 youtube-transcript-api>=1.2,<2    # 자막 추출 (1.x 인스턴스 API: .fetch() / to_raw_data())
 yt-dlp>=2026.6.9                # HF Spaces fallback: YouTube timedtext/Android client 자막 추출
+curl_cffi>=0.10.0                # yt-dlp browser TLS impersonation for HF/Webshare/YouTube
 python-dotenv>=1.0
