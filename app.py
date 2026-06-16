@@ -88,7 +88,8 @@ class _TimeoutSession(requests.Session):
     """모든 요청에 (connect, read) 타임아웃 강제 — 느리거나 막힌 프록시 IP에 오래 매달리지 않게."""
 
     def request(self, *args, **kwargs):
-        kwargs.setdefault("timeout", (8, 15))
+        # (connect, read) — HF 등 클라우드는 프록시 경유 응답이 느려서 read를 넉넉히(30s).
+        kwargs.setdefault("timeout", (10, 30))
         return super().request(*args, **kwargs)
 
 
@@ -116,7 +117,7 @@ def fetch_transcript(video_id: str) -> list:
     if ws_user and ws_pass:
         return _fetch(
             WebshareProxyConfig(
-                proxy_username=ws_user, proxy_password=ws_pass, retries_when_blocked=5
+                proxy_username=ws_user, proxy_password=ws_pass, retries_when_blocked=3
             )
         )
 
