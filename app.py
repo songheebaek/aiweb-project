@@ -39,6 +39,14 @@ print(
 # 자막 언어 우선순위 (한국어 → 영어 순으로 시도)
 TRANSCRIPT_LANGS = ["ko", "en"]
 
+# 프록시 출구 IP 국가 고정: 유튜브가 막는 지역(남미 등)을 피하고 통과 잘 되는 국가만 사용.
+# (HF 등 클라우드는 기본적으로 막힌 지역 IP를 받는 경우가 있어 고정 필요.) .env로 조정 가능.
+PROXY_IP_LOCATIONS = [
+    c.strip().lower()
+    for c in os.getenv("PROXY_IP_LOCATIONS", "us,jp,kr,gb").split(",")
+    if c.strip()
+]
+
 # 테스터가 바로 체험할 수 있는 예시 영상 (클릭하면 URL 입력창에 자동 입력)
 # 칩 라벨은 짧은 카테고리, 마우스 호버 시 실제 제목(help) 표시.
 EXAMPLES = [
@@ -95,7 +103,9 @@ def _proxy_selftest():
         return True
     sess = requests.Session()
     sess.proxies = WebshareProxyConfig(
-        proxy_username=ws_user, proxy_password=ws_pass
+        proxy_username=ws_user,
+        proxy_password=ws_pass,
+        filter_ip_locations=PROXY_IP_LOCATIONS or None,
     ).to_requests_dict()
     for name, url in [
         ("ipify(출구IP)", "https://api.ipify.org"),
@@ -151,6 +161,7 @@ def fetch_transcript(video_id: str) -> list:
                         proxy_username=ws_user,
                         proxy_password=ws_pass,
                         retries_when_blocked=0,
+                        filter_ip_locations=PROXY_IP_LOCATIONS or None,
                     )
                 )
             except (TranscriptsDisabled, NoTranscriptFound, VideoUnavailable):
