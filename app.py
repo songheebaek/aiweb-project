@@ -7,6 +7,7 @@ UI는 프로젝트 썸네일 목업 디자인을 따름 (헤더 → URL바 → �
 배포:       Dockerfile/docker-compose 참조 (포트 8501)
 """
 
+import json
 import os
 import random
 import re
@@ -241,6 +242,116 @@ def _is_retryable_transcript_error(exc: Exception) -> bool:
     return any(marker in text for marker in retryable_markers)
 
 
+def _transcript_fetch_engine() -> str:
+    """Transcript engine selection: auto, yt_dlp, or youtube_transcript_api."""
+    engine = os.getenv("TRANSCRIPT_FETCH_ENGINE", "auto").strip().lower().replace("-", "_")
+    aliases = {
+        "ytdlp": "yt_dlp",
+        "yt_dlp": "yt_dlp",
+        "youtube_transcript_api": "youtube_transcript_api",
+        "youtube-transcript-api": "youtube_transcript_api",
+        "yta": "youtube_transcript_api",
+        "auto": "auto",
+    }
+    resolved = aliases.get(engine, "auto")
+    if resolved != engine and engine not in aliases:
+        print(f"[DIAG] TRANSCRIPT_FETCH_ENGINE 값 무시: invalid={engine!r}, fallback=auto", flush=True)
+    return resolved
+
+
+def _caption_name(track: dict) -> str:
+    name = track.get("name")
+    if isinstance(name, str):
+        return name
+    if isinstance(name, dict):
+        if name.get("simpleText"):
+            return str(name["simpleText"])
+        runs = name.get("runs") or []
+        return "".join(str(run.get("text", "")) for run in runs)
+    return ""
+
+
+def _json3_caption_to_segments(payload: dict) -> list[dict]:
+    segments: list[dict] = []
+    for event in payload.get("events") or []:
+        if "segs" not in event:
+            continue
+        text = "".join(str(seg.get("utf8", "")) for seg in event.get("segs") or [])
+        text = re.sub(r"\s+", " ", text).strip()
+        if not text:
+            continue
+        start = float(event.get("tStartMs", 0) or 0) / 1000
+        duration = float(event.get("dDurationMs", 0) or 0) / 1000
+        segments.append({"text": text, "start": start, "duration": duration})
+    return segments
+
+
+def _pick_yt_dlp_caption_track(info: dict) -> tuple[str, str, dict] | None:
+    """Prefer manual captions, then automatic captions, in TRANSCRIPT_LANGS order."""
+    for source_name in ("subtitles", "automatic_captions"):
+        captions = info.get(source_name) or {}
+        for lang in TRANSCRIPT_LANGS:
+            tracks = captions.get(lang) or []
+            json_tracks = [track for track in tracks if track.get("ext") == "json3" and track.get("url")]
+            if json_tracks:
+                return source_name, lang, json_tracks[0]
+    return None
+
+
+def fetch_transcript_with_ytdlp(video_id: str, proxy_config, proxy_mode: str) -> list[dict]:
+    """Fallback transcript fetcher using yt-dlp's YouTube clients.
+
+    youtube-transcript-api starts from /watch HTML. On HF Spaces that path can
+    fail through Webshare with TLS EOF. yt-dlp can obtain caption URLs via
+    alternate YouTube clients and then fetch timedtext JSON3 captions.
+    """
+    try:
+        from yt_dlp import YoutubeDL
+    except Exception as e:
+        raise RuntimeError("yt-dlp fallback을 사용할 수 없습니다. requirements.txt에 yt-dlp가 필요합니다.") from e
+
+    proxy_url = getattr(proxy_config, "url", None) if proxy_config else None
+    opts = {
+        "skip_download": True,
+        "quiet": True,
+        "no_warnings": True,
+        "writesubtitles": True,
+        "writeautomaticsub": True,
+        "subtitleslangs": TRANSCRIPT_LANGS,
+        "socket_timeout": 20,
+        "retries": 2,
+        "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
+    }
+    if proxy_url:
+        opts["proxy"] = proxy_url
+
+    print(f"[DIAG] yt-dlp fallback: 시작 (mode={proxy_mode}, video_id={video_id})", flush=True)
+    with YoutubeDL(opts) as ydl:
+        info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
+        picked = _pick_yt_dlp_caption_track(info or {})
+        if not picked:
+            raise RuntimeError("yt-dlp fallback: 한국어/영어 자막 트랙을 찾지 못했습니다.")
+        source_name, lang, track = picked
+        print(
+            f"[DIAG] yt-dlp fallback: 자막 트랙 선택 "
+            f"(source={source_name}, lang={lang}, name={_caption_name(track)!r})",
+            flush=True,
+        )
+        with ydl.urlopen(track["url"]) as response:
+            raw = response.read()
+
+    if isinstance(raw, str):
+        raw_text = raw
+    else:
+        raw_text = raw.decode("utf-8", errors="replace")
+    payload = json.loads(raw_text)
+    segments = _json3_caption_to_segments(payload)
+    if not segments:
+        raise RuntimeError("yt-dlp fallback: 자막 JSON은 받았지만 내용이 비어 있습니다.")
+    print(f"[DIAG] yt-dlp fallback: 성공 (segments={len(segments)}, mode={proxy_mode})", flush=True)
+    return segments
+
+
 @st.cache_resource(show_spinner=False)
 def _proxy_selftest():
     """[DIAG] 프록시 경유로 (1)출구IP (2)유튜브 접속을 점검해 로그로 남김.
@@ -357,34 +468,65 @@ def fetch_transcript(video_id: str) -> list:
                     ),
                 ))
 
+        engine = _transcript_fetch_engine()
+        print(f"[DIAG] transcript engine: {engine}", flush=True)
         last_error = None
         for mode_name, proxy_factory in attempts:
-            try:
-                print(f"[DIAG] {mode_name}로 자막 요청을 시작합니다.", flush=True)
-                return _fetch_with_retries(proxy_factory, mode_name)
-            except (TranscriptsDisabled, NoTranscriptFound, VideoUnavailable):
-                raise
-            except Exception as e:
-                last_error = e
-                retryable = _is_retryable_transcript_error(e)
-                print(
-                    f"[DIAG] {mode_name} 최종 실패: "
-                    f"retryable={retryable}, error={type(e).__name__} - {_scrub(e)}",
-                    flush=True,
-                )
-                if not retryable:
-                    break
-                if mode_name != attempts[-1][0]:
-                    print("[DIAG] 다음 Webshare 포트/국가 조합으로 폴백합니다.", flush=True)
+            proxy_config = proxy_factory()
+
+            if engine in ("auto", "yt_dlp"):
+                try:
+                    print(f"[DIAG] {mode_name}로 yt-dlp fallback 자막 요청을 시작합니다.", flush=True)
+                    return fetch_transcript_with_ytdlp(video_id, proxy_config, mode_name)
+                except Exception as e:
+                    last_error = e
+                    print(
+                        f"[DIAG] {mode_name} yt-dlp fallback 실패: "
+                        f"{type(e).__name__} - {_scrub(e)}",
+                        flush=True,
+                    )
+                    if engine == "yt_dlp" and mode_name != attempts[-1][0]:
+                        print("[DIAG] 다음 Webshare 포트/국가 조합으로 폴백합니다.", flush=True)
+                        continue
+
+            if engine in ("auto", "youtube_transcript_api"):
+                try:
+                    print(f"[DIAG] {mode_name}로 youtube-transcript-api 자막 요청을 시작합니다.", flush=True)
+                    return _fetch_with_retries(lambda proxy_config=proxy_config: proxy_config, mode_name)
+                except (TranscriptsDisabled, NoTranscriptFound, VideoUnavailable):
+                    raise
+                except Exception as e:
+                    last_error = e
+                    retryable = _is_retryable_transcript_error(e)
+                    print(
+                        f"[DIAG] {mode_name} youtube-transcript-api 최종 실패: "
+                        f"retryable={retryable}, error={type(e).__name__} - {_scrub(e)}",
+                        flush=True,
+                    )
+                    if not retryable:
+                        break
+
+            if mode_name != attempts[-1][0]:
+                print("[DIAG] 다음 Webshare 포트/국가 조합으로 폴백합니다.", flush=True)
         raise last_error if last_error else RuntimeError("Webshare transcript fetch 실패")
 
     # 프록시 없이 직접 연결
+    engine = _transcript_fetch_engine()
     print("[DIAG] ⚠️ Webshare 프록시 설정이 없어 직접 연결을 시도합니다. (클라우드 환경에서는 차단 가능성 높음)", flush=True)
-    try:
-        return _fetch_with_retries(lambda: None, "direct")
-    except Exception as e:
-        print(f"[DIAG] direct transcript 최종 실패: {type(e).__name__} - {_scrub(e)}", flush=True)
-        raise
+    if engine in ("auto", "yt_dlp"):
+        try:
+            return fetch_transcript_with_ytdlp(video_id, None, "direct")
+        except Exception as e:
+            print(f"[DIAG] direct yt-dlp fallback 최종 실패: {type(e).__name__} - {_scrub(e)}", flush=True)
+            if engine == "yt_dlp":
+                raise
+    if engine in ("auto", "youtube_transcript_api"):
+        try:
+            return _fetch_with_retries(lambda: None, "direct")
+        except Exception as e:
+            print(f"[DIAG] direct youtube-transcript-api 최종 실패: {type(e).__name__} - {_scrub(e)}", flush=True)
+            raise
+    raise RuntimeError("자막 fetch 실패")
 
 
 def build_timestamped_text(segments: list) -> str:
