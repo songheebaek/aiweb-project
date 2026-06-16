@@ -24,6 +24,11 @@ on:
       - main
   workflow_dispatch:
 
+# 연속 push 시 오래된 sync가 최신 것을 덮어쓰는 race 방지: 최신 run만 실행, 진행 중인 older run은 취소
+concurrency:
+  group: sync-to-hf
+  cancel-in-progress: true
+
 jobs:
   sync:
     runs-on: ubuntu-latest
