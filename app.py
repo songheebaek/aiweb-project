@@ -119,7 +119,7 @@ def fetch_transcript(video_id: str) -> list:
     if ws_user and ws_pass:
         return _fetch(
             WebshareProxyConfig(
-                proxy_username=ws_user, proxy_password=ws_pass, retries_when_blocked=2
+                proxy_username=ws_user, proxy_password=ws_pass, retries_when_blocked=10
             )
         )
 
