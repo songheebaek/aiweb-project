@@ -1,4 +1,4 @@
-# YouTube 영상 요약기 — Streamlit + Gemini 2.5 Flash(무료 티어)
+# YouTube 영상 요약기 — Streamlit + Gemini 3 Flash (폴백: Gemini 2.5 Flash)
 # 트랙 A (LLM API). Oracle E2.1.Micro + Docker 배포 대상.
 
 streamlit>=1.40,<2

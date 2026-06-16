@@ -16,12 +16,13 @@ from google.genai import errors as genai_errors
 # 곧바로 안 풀리고, 적은 무료 한도(RPD/RPM)만 더 깎아먹으므로 재시도하지 않고 폴백 모델로 넘긴다.
 _RETRYABLE = {500, 503}
 
-# 무료 티어 모델. 기본 gemini-2.5-flash. 다른 모델로 바꾸려면 .env의 GEMINI_MODEL 사용.
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+# 기본 모델 gemini-3-flash-preview. 다른 모델로 바꾸려면 .env의 GEMINI_MODEL 사용.
+# (예: 더 안정적인 비-프리뷰 원하면 GEMINI_MODEL=gemini-3.5-flash)
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")
 
-# 기본 모델이 503(과부하)로 계속 실패하면 폴백할 모델들 (둘 다 무료 티어).
-# (gemini-2.0-flash는 퇴출되어 404 → 살아있는 gemini-2.5-flash-lite로 교체)
-_FALLBACK_MODELS = [m for m in [GEMINI_MODEL, "gemini-2.5-flash-lite"] if m]
+# 기본 모델이 503(과부하)로 계속 실패하면 폴백할 모델.
+# 폴백은 안정적인 gemini-2.5-flash (gemini-2.0-flash는 퇴출되어 404였음).
+_FALLBACK_MODELS = [m for m in [GEMINI_MODEL, "gemini-2.5-flash"] if m]
 _FALLBACK_MODELS = list(dict.fromkeys(_FALLBACK_MODELS))  # 중복 제거(순서 유지)
 
 # Gemini Flash 컨텍스트는 100만 토큰 → 웬만한 장편 영상 자막도 통째로 들어감.
