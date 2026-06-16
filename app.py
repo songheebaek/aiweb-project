@@ -81,7 +81,33 @@ def _webshare_settings() -> tuple[str | None, str | None, list[str]]:
     return username, password, locations
 
 
-def _webshare_proxy_config(locations_override: list[str] | None = None) -> WebshareProxyConfig | None:
+def _webshare_proxy_ports() -> list[int]:
+    """Return Webshare proxy ports to try in order.
+
+    Webshare's rotating endpoint defaults to 80, but HF Spaces has shown
+    proxy/tunnel quirks on outbound ports in some cases. Try documented
+    alternative ports first, then fall back to Webshare's default port 80.
+    """
+    raw_values = _csv_env("WEBSHARE_PROXY_PORTS") or ["1080", "3128", "10000", "80"]
+    ports: list[int] = []
+    for raw in raw_values:
+        try:
+            port = int(raw)
+        except ValueError:
+            print(f"[DIAG] Webshare proxy port 무시: invalid={raw!r}", flush=True)
+            continue
+        if port <= 0 or port > 65535:
+            print(f"[DIAG] Webshare proxy port 무시: out_of_range={port}", flush=True)
+            continue
+        if port not in ports:
+            ports.append(port)
+    return ports or [80]
+
+
+def _webshare_proxy_config(
+    locations_override: list[str] | None = None,
+    proxy_port: int | None = None,
+) -> WebshareProxyConfig | None:
     username, password, configured_locations = _webshare_settings()
     if not (username and password):
         return None
@@ -90,6 +116,7 @@ def _webshare_proxy_config(locations_override: list[str] | None = None) -> Websh
         proxy_username=username,
         proxy_password=password,
         filter_ip_locations=locations or None,
+        proxy_port=proxy_port or _webshare_proxy_ports()[0],
     )
 
 
@@ -103,6 +130,7 @@ def _startup_diagnostics_once():
         f"  - Webshare username 로드 여부: {bool(ws_user)} ({_mask(ws_user)})\n"
         f"  - Webshare password 로드 여부: {bool(ws_pass)}\n"
         f"  - Webshare 국가 필터: {ws_locations or '전체 풀'}\n"
+        f"  - Webshare 포트 시도 순서: {_webshare_proxy_ports()}\n"
         f"  - LLM provider: {model_config.LLM_PROVIDER_NAME} ({model_config.LLM_MODEL})\n"
         + "=" * 50 + "\n",
         flush=True,
@@ -315,15 +343,19 @@ def fetch_transcript(video_id: str) -> list:
             flush=True,
         )
 
-        attempts: list[tuple[str, callable]] = [(
-            f"Webshare[{location_msg}]",
-            lambda: _webshare_proxy_config(),
-        )]
+        location_attempts: list[tuple[str, list[str] | None]] = [(location_msg, None)]
         if locations:
-            attempts.append((
-                "Webshare[전체 풀 폴백]",
-                lambda: _webshare_proxy_config([]),
-            ))
+            location_attempts.append(("전체 풀 폴백", []))
+
+        attempts: list[tuple[str, callable]] = []
+        for location_name, location_override in location_attempts:
+            for port in _webshare_proxy_ports():
+                attempts.append((
+                    f"Webshare[{location_name}, port={port}]",
+                    lambda location_override=location_override, port=port: _webshare_proxy_config(
+                        location_override, proxy_port=port
+                    ),
+                ))
 
         last_error = None
         for mode_name, proxy_factory in attempts:
@@ -343,7 +375,7 @@ def fetch_transcript(video_id: str) -> list:
                 if not retryable:
                     break
                 if mode_name != attempts[-1][0]:
-                    print("[DIAG] 국가 제한 풀 실패로 Webshare 전체 풀 폴백을 시도합니다.", flush=True)
+                    print("[DIAG] 다음 Webshare 포트/국가 조합으로 폴백합니다.", flush=True)
         raise last_error if last_error else RuntimeError("Webshare transcript fetch 실패")
 
     # 프록시 없이 직접 연결
