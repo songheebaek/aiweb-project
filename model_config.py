@@ -20,7 +20,8 @@ _RETRYABLE = {500, 503}
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 # 기본 모델이 503(과부하)로 계속 실패하면 폴백할 모델들 (둘 다 무료 티어).
-_FALLBACK_MODELS = [m for m in [GEMINI_MODEL, "gemini-2.0-flash"] if m]
+# (gemini-2.0-flash는 퇴출되어 404 → 살아있는 gemini-2.5-flash-lite로 교체)
+_FALLBACK_MODELS = [m for m in [GEMINI_MODEL, "gemini-2.5-flash-lite"] if m]
 _FALLBACK_MODELS = list(dict.fromkeys(_FALLBACK_MODELS))  # 중복 제거(순서 유지)
 
 # Gemini Flash 컨텍스트는 100만 토큰 → 웬만한 장편 영상 자막도 통째로 들어감.
