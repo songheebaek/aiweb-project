@@ -27,6 +27,14 @@ import model_config
 
 load_dotenv()
 
+# [DIAG] 배포 환경에서 프록시 Secret이 실제로 로드됐는지 시작 시 로그로 확인 (값은 노출 안 함)
+print(
+    "[DIAG] proxy at startup: "
+    f"webshare={bool(os.getenv('WEBSHARE_PROXY_USERNAME') and os.getenv('WEBSHARE_PROXY_PASSWORD'))}, "
+    f"proxy_url={bool(os.getenv('PROXY_URL'))}",
+    flush=True,
+)
+
 # 자막 언어 우선순위 (한국어 → 영어 순으로 시도)
 TRANSCRIPT_LANGS = ["ko", "en"]
 
@@ -401,16 +409,19 @@ if analyze:
             st.error(f"한국어/영어 자막을 찾지 못했습니다. (지원: {', '.join(TRANSCRIPT_LANGS)})"); st.stop()
         except VideoUnavailable:
             st.error("영상을 찾을 수 없습니다. 비공개이거나 삭제된 영상일 수 있어요."); st.stop()
-        except (IpBlocked, RequestBlocked):
+        except (IpBlocked, RequestBlocked) as e:
+            print(f"[DIAG] transcript IpBlocked/RequestBlocked: {type(e).__name__}: {e}", flush=True)
             st.error(
                 "유튜브가 이 서버/프록시 IP를 차단했습니다. "
                 "프록시를 이미 설정했다면 그 IP도 막힌 거예요(무료 데이터센터 프록시는 자주 차단됨) — "
                 "다른 IP 또는 주거용(residential) 프록시가 필요합니다. "
                 "(배포 환경에선 HF Secret의 PROXY_URL 또는 WEBSHARE_PROXY_USERNAME/PASSWORD 사용)"
             ); st.stop()
-        except CouldNotRetrieveTranscript:
+        except CouldNotRetrieveTranscript as e:
+            print(f"[DIAG] transcript CouldNotRetrieveTranscript: {type(e).__name__}: {e}", flush=True)
             st.error("자막을 가져오지 못했습니다. 클라우드 서버라면 IP 차단일 수 있어요 (PROXY_URL 설정 필요)."); st.stop()
         except Exception as e:
+            print(f"[DIAG] transcript error: {type(e).__name__}: {e}", flush=True)
             m = str(e)
             if any(k in m for k in ("SSL", "Max retries", "ConnectionError", "Connection", "timed out", "RemoteDisconnected", "EOF")):
                 st.error("자막 서버 연결이 차단됐어요. 배포 서버(클라우드) IP를 YouTube가 막는 경우예요 — 프록시(Webshare/PROXY_URL) 설정이 필요합니다. (로컬에선 정상 동작)"); st.stop()
