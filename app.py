@@ -138,15 +138,27 @@ def fetch_transcript(video_id: str) -> list:
         api = YouTubeTranscriptApi(proxy_config=proxy_config, http_client=_TimeoutSession())
         return api.fetch(video_id, languages=TRANSCRIPT_LANGS).to_raw_data()
 
-    # 1) Webshare residential
-    #    막힌 출구 IP는 라이브러리가 내부적으로 새 IP로 자동 재시도(retries_when_blocked).
-    #    외부 재시도를 또 두면 내부 재시도와 곱해져 매우 느려지므로 두지 않음. (10→5로 낮춰 최악 시간 단축)
+    # 1) Webshare residential.
+    #    유튜브가 일부 출구 IP를 막음(SSL EOF). 라이브러리 내부 재시도(retries_when_blocked)는
+    #    IP 회전이 잘 안 돼 효과가 없었음 → 내부 재시도는 끄고(retries_when_blocked=0, 빠른 실패),
+    #    매 시도마다 '완전히 새 세션'을 만들어 새 회전 IP를 받게 해서 좋은 IP를 만날 때까지 반복.
     if ws_user and ws_pass:
-        return _fetch(
-            WebshareProxyConfig(
-                proxy_username=ws_user, proxy_password=ws_pass, retries_when_blocked=10
-            )
-        )
+        last_err = None
+        for attempt in range(6):
+            try:
+                return _fetch(
+                    WebshareProxyConfig(
+                        proxy_username=ws_user,
+                        proxy_password=ws_pass,
+                        retries_when_blocked=0,
+                    )
+                )
+            except (TranscriptsDisabled, NoTranscriptFound, VideoUnavailable):
+                raise  # 영상 자체 문제 → 재시도 무의미
+            except Exception as e:
+                last_err = e
+                print(f"[DIAG] webshare attempt {attempt + 1}/6 failed: {type(e).__name__}", flush=True)
+        raise last_err
 
     # 2) PROXY_URL 리스트 순회 (막힌 프록시는 건너뛰고 다음 것 시도)
     if proxy_urls:
