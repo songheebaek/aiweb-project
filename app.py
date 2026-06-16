@@ -84,6 +84,31 @@ def fmt_time(seconds: float) -> str:
     return f"{h}:{m:02d}:{s:02d}" if h else f"{m:02d}:{s:02d}"
 
 
+@st.cache_resource(show_spinner=False)
+def _proxy_selftest():
+    """배포 환경 진단(1회): 프록시 경유로 (1)출구IP (2)유튜브 접속을 점검해 로그로 남김.
+    어느 구간이 깨지는지(프록시 터널 vs 유튜브 차단) 구분하기 위함."""
+    ws_user = os.getenv("WEBSHARE_PROXY_USERNAME")
+    ws_pass = os.getenv("WEBSHARE_PROXY_PASSWORD")
+    if not (ws_user and ws_pass):
+        print("[DIAG] selftest: webshare 자격증명 없음", flush=True)
+        return True
+    sess = requests.Session()
+    sess.proxies = WebshareProxyConfig(
+        proxy_username=ws_user, proxy_password=ws_pass
+    ).to_requests_dict()
+    for name, url in [
+        ("ipify(출구IP)", "https://api.ipify.org"),
+        ("youtube", "https://www.youtube.com/robots.txt"),
+    ]:
+        try:
+            r = sess.get(url, timeout=20)
+            print(f"[DIAG] selftest {name}: HTTP {r.status_code} {r.text[:40].strip()!r}", flush=True)
+        except Exception as e:
+            print(f"[DIAG] selftest {name}: ERR {type(e).__name__}: {str(e)[:90]}", flush=True)
+    return True
+
+
 class _TimeoutSession(requests.Session):
     """모든 요청에 (connect, read) 타임아웃 강제 — 느리거나 막힌 프록시 IP에 오래 매달리지 않게."""
 
@@ -202,6 +227,9 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed",
 )
+
+# 배포 환경 진단: 프록시 경유 접속 자가테스트 1회 (로그 확인용)
+_proxy_selftest()
 
 st.markdown(
     """
