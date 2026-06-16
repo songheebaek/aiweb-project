@@ -1,4 +1,4 @@
-# YouTube 영상 요약기 (Streamlit + Gemini) → Oracle E2.1.Micro 배포용 이미지
+# YouTube 영상 요약기 (Streamlit + LLM provider) → Oracle E2.1.Micro 배포용 이미지
 # week10/스트레스 몬스터 Dockerfile 패턴 재활용. 런타임만 Gradio→Streamlit으로 교체.
 #
 # 빌드:  docker build -t youtube-summarizer:latest .
@@ -19,7 +19,7 @@ RUN pip install --no-cache-dir --upgrade pip \
  && pip install --no-cache-dir -r requirements.txt
 
 # 앱 소스
-COPY app.py model_config.py ./
+COPY app.py model_config.py model_config_gemini.py model_config_openai.py ./
 
 EXPOSE 8501
 

@@ -1,7 +1,8 @@
-# YouTube 영상 요약기 — Streamlit + Gemini 3.5 Flash (폴백: Gemini 3 Flash Preview)
+# YouTube 영상 요약기 — Streamlit + Gemini/OpenAI provider
 # 트랙 A (LLM API). Oracle E2.1.Micro + Docker 배포 대상.
 
 streamlit>=1.40,<2
 google-genai>=1.0                 # Gemini API SDK (구 google-generativeai는 EOL → 신 SDK)
+openai>=2.0                       # OpenAI Responses API / GPT provider
 youtube-transcript-api>=1.2,<2    # 자막 추출 (1.x 인스턴스 API: .fetch() / to_raw_data())
 python-dotenv>=1.0
